@@ -3153,10 +3153,10 @@ output$Unsupervised <- renderMenu({
           mod2 = mod2[,unlist(x)]
         }
 
-        if(input$BaseOrHealthy == "With Respect to HCs"){
+        if(input$BaseOrHealthyOther == "With Respect to HCs"){
           mod2 = values$long_mod
         }
-        if(input$BaseOrHealthy == "With Respect to Baseline"){
+        if(input$BaseOrHealthyOther == "With Respect to Baseline"){
           mod2 <- values$long_mod2
         }
       }

@@ -1638,16 +1638,24 @@ output$Unsupervised <- renderMenu({
     if(length(which(names(groups) %in% values$patient_id))){
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
-
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -1661,15 +1669,24 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -1677,9 +1694,9 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
 
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
@@ -2280,15 +2297,23 @@ output$Unsupervised <- renderMenu({
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -2302,15 +2327,24 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -2318,9 +2352,9 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
 
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
@@ -2785,16 +2819,24 @@ output$Unsupervised <- renderMenu({
     if(length(which(names(groups) %in% values$patient_id))){
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
-
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -2808,25 +2850,34 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
         }
       }
     }
-
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
 
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
@@ -3404,15 +3455,23 @@ output$Unsupervised <- renderMenu({
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -3426,15 +3485,24 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -3442,9 +3510,9 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
 
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
@@ -3982,15 +4050,23 @@ output$Unsupervised <- renderMenu({
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -4004,15 +4080,24 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -4020,9 +4105,9 @@ output$Unsupervised <- renderMenu({
       }
     }
 
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
 
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
@@ -5099,14 +5184,22 @@ output$Unsupervised <- renderMenu({
     if(length(which(names(groups) %in% values$patient_id))){
       groups[,which(names(groups) %in% values$patient_id)]<-as.numeric(as.factor(groups[,which(names(groups) %in% values$patient_id)]))
     }
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i]) & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-    else{
+      else{
+        for(i in 1:ncol(groups)){
+          if(is.numeric(groups[,i])){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+      }
+    } else{
       for(i in 1:ncol(groups)){
         if(is.numeric(groups[,i])){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
@@ -5118,23 +5211,32 @@ output$Unsupervised <- renderMenu({
         groups[,i] <- as.character((groups[,i]))
       }
     }
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      for(i in 1:ncol(groups)){
-        if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
-          groups[,i] <- as.numeric(as.factor(groups[,i]))
+    if(!is.null(values$time_var)){
+      if(values$time_var %in% colnames(groups)){
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10 & groups[,i] != groups[,values$time_var]){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
+        }
+        groups[,values$time_var] = as.factor(groups[,values$time_var])
+      }
+      else{
+        for(i in 1:ncol(groups)){
+          if(length(unique(groups[,i])) > 10){
+            groups[,i] <- as.numeric(as.factor(groups[,i]))
+          }
         }
       }
-    }
-    else{
+    } else{
       for(i in 1:ncol(groups)){
         if(length(unique(groups[,i])) > 10){
           groups[,i] <- as.numeric(as.factor(groups[,i]))
         }
       }
     }
-    if(!is.null(values$time_var) & values$time_var %in% colnames(groups)){
-      groups[,values$time_var] = as.factor(groups[,values$time_var])
-    }
+    #if(values$time_var %in% colnames(groups)){
+      #groups[,values$time_var] = as.factor(groups[,values$time_var])
+    #}
     n_groups = ncol(groups)
     palette_set = setPalettes(n_groups)
     factors = unlist(apply(groups, 2, function(x) as.data.frame(factor(x))), recursive=F)

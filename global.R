@@ -203,6 +203,101 @@ getLevels = function(x) {
   as.character(levels(x))
 }
 
+getNorm <- function(x, y, colname, id, mynames, index_sid, index_refvar,
+                    ref_level, keep = TRUE) {
+  dat <- x[which(x[, index_sid] == id), mynames]
+  lev_name <- dat[dat[, 3] == ref_level, colname]
+  if (keep == TRUE) {
+    lev_norm <- y[, as.character(dat[, colname])] - y[, as.character(lev_name)]
+  }
+  if (keep == FALSE) {
+    index <- setdiff(as.character(dat[, colname]), as.character(lev_name))
+    lev_norm <- y[, index] - y[, as.character(lev_name)]
+    if (length(index) == 1) {
+      lev_norm <- data.frame(lev_norm)
+      names(lev_norm) <- as.character(dat[, colname][dat[, colname] %in% index])
+    }
+  }
+  return(lev_norm)
+}
+
+getNorm2 <- function(y, colnames_lev, colnames_lev_rm, keep = TRUE) {
+  index_lev <- which(names(y) %in% colnames_lev)
+  index_lev_rm <- which(names(y) %in% colnames_lev_rm)
+  if (keep == FALSE) {
+    normdat <- y[, index_lev_rm] - apply(y[, index_lev], 1, mean)
+  }
+  if (keep == TRUE) {
+    normdat <- y[, c(index_lev, index_lev_rm)] - apply(y[, index_lev], 1, mean)
+  }
+  return(normdat)
+}
+
+dataManipulate <- function(y, x, colname, ref_var, ref_level, long = FALSE,
+                           subjects, keep = TRUE, format = "Probes",
+                           allsamples = TRUE) {
+  index_samples <- which(names(y) %in% x[, colname])
+  if (format == "Probes") {
+    index_ps <- which(names(y) %in% c("PROBE_ID", "SYMBOL"))
+  }
+  if (format == "Modules") {
+    index_ps <- which(names(y) %in% c("Module"))
+  }
+  y <- y[, c(index_ps, index_samples)]
+  if (allsamples == FALSE) {
+    if (long == TRUE) {
+      index_refvar <- which(names(x) == ref_var)
+      lev <- x[which(x[, index_refvar] == ref_level), ]
+      lev_rm <- x[which(x[, index_refvar] != ref_level), ]
+      index_subid <- which(names(x) == subjects)
+      lev_subids <- unique(lev[, index_subid])
+      lev_rm_subids <- unique(lev_rm[, index_subid])
+      index_include <- lev_subids %in% lev_rm_subids
+      complete_ids <- lev_subids[index_include]
+      lev_norm <- vector("list", length(complete_ids))
+      for (i in 1:(length(lev_norm))) {
+        lev_norm[[i]] <- getNorm(y = y, x = x, colname = colname,
+                                 id = complete_ids[i], index_sid = index_subid,
+                                 mynames = c(subjects, "columnname", ref_var),
+                                 index_refvar = index_refvar,
+                                 ref_level = ref_level, keep = keep)
+      }
+      lev_norm <- do.call("cbind", lev_norm)
+      design_norm <- x[(x[, index_subid] %in% complete_ids), ]
+      if (keep == FALSE) {
+        design_norm <- design_norm[(design_norm[, index_refvar] != ref_level), ]
+      }
+    }
+    if (long == FALSE) {
+      index_refvar <- which(names(x) == ref_var)
+      lev <- x[which(x[, index_refvar] == ref_level), ]
+      lev_rm <- x[which(x[, index_refvar] != ref_level), ]
+      lev_names <- lev[, colname]
+      lev_rm_names <- lev_rm[, colname]
+      lev_norm <- getNorm2(y = y, lev_names, lev_rm_names, keep = keep)
+      if (keep == FALSE) {
+        design_norm <- lev_rm
+      }
+      if (keep == TRUE) {
+        design_norm <- x
+      }
+    }
+  } else {
+    means_y <- as.vector(apply(y[, -(1:2)], 1, mean))
+    lev_norm <- y[, -c(1:2)] - means_y
+    design_norm <- x
+  }
+  final_norm_shuff <- as.matrix(lev_norm)
+  colnames(final_norm_shuff) <- names(lev_norm)
+  if (format == "Probes") {
+    rownames(final_norm_shuff) <- y$SYMBOL
+  }
+  if (format == "Modules") {
+    rownames(final_norm_shuff) <- y$Module
+  }
+  return(list(heatexp = final_norm_shuff, heatdes = design_norm))
+}
+
 
 data.manipulate<-function(exp,des,basevariable,baselevel,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=T){
   index.samples<-which(names(exp) %in% des$columnname)

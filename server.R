@@ -23,15 +23,15 @@ shinyServer(function(input,output, session){
 
   setBookmarkExclude(c("file1"))
   output$test<-renderUI({
-
     if(is.null(values$h3_rowdendro)){
-      if(hc ==TRUE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2)
+      if(values$hc ==TRUE){
+        try<-list("All Samples Median Normalized" = 3,
+                  "All Samples Healthy Normalized" = 4,
+                  "Non-Healthy Samples Median Normalized" = 6)
       }
 
-      if(hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1)
+      if(values$hc == FALSE){
+        try<-list("All Samples Median Normalized" = 3)
       }
     }
 
@@ -50,7 +50,6 @@ shinyServer(function(input,output, session){
                   "All Samples Baseline Normalized"=5)
       }
     }
-
     selectInput("set", "Select heatmap:",as.list(try))
   })
 
@@ -3700,62 +3699,65 @@ output$Unsupervised <- renderMenu({
 
   heatmapdata<-reactive({
     if (input$set==1){#heatmapbase1
-      base_sample_name=values$design$columnname[values$design[,baseline_var]==values$baseline_val]
-      ind1<-which(colnames(values$final_expression)%in%c("PROBE_ID","SYMBOL"))
-      ind2<-which(colnames(values$final_expression)%in%base_sample_name)
+      if(values$hc == TRUE){
+        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val & values$design[,values$control_var] != values$control_val)]
+        ind1 <- which(colnames(values$final_expression) %in% c("PROBE_ID", "SYMBOL"))
+        ind2 <- which(colnames(values$final_expression) %in% base_sample_name)
+      }
+      if(values$hc == FALSE){
+        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val)]
+        ind1 <- which(colnames(values$final_expression) %in% c("PROBE_ID", "SYMBOL"))
+        ind2 <- which(colnames(values$final_expression) %in% base_sample_name)
+      }
       if(input$uploadprobes == FALSE){
-        exp_base_sam=values$final_expression[,c(ind1,ind2)]
-        des_base_sam=values$design[which(values$design$columnname%in%colnames(exp_base_sam)),]
-        y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$baseline_val,longitudinal=FALSE,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+        exp_base_sam <- values$final_expression[, c(ind1, ind2)]
+        des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)),]
+        dataManipulate(y = exp_base_sam, x = des_base_sam, 
+                       colname = "columnname", format = "Probes", 
+                       allsamples = TRUE)
+        y<-dataManipulate(y = exp_base_sam, x = des_base_sam,colname = "columnname", format = "Probes",allsamples = TRUE)
         ddm<-values$h1b_rowdendro
         colddm<-values$h1b_coldendro
       }
-
       if(input$uploadprobes == TRUE){
         probes <- read.csv(input$probe_select$datapath, header = TRUE)
         probes.vector <- as.character(probes[,1])
         exp_base_sam=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector), c(ind1,ind2)]
         des_base_sam=values$design[which(values$design$columnname%in%colnames(exp_base_sam)),]
-        y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$baseline_val,longitudinal=FALSE,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+        y<-dataManipulate(y = exp_base_sam,x = des_base_sam,colname = "columnname",format = "Probes",allsamples = TRUE)
         ddm<-values$h1b_rowdendro
         colddm<-values$h1b_coldendro
       }
     }
     if (input$set==2){#heatmapbase2
-      base_sample_name=values$design$columnname[values$design[,baseline_var]==values$baseline_val]
-      ind1<-which(colnames(values$final_expression)%in%c("PROBE_ID","SYMBOL"))
-      ind2<-which(colnames(values$final_expression)%in%base_sample_name)
-
+      base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var]==values$baseline_val | values$design[,values$control_var]==values$control_val)]
+      ind1 <- which(colnames(final_expression) %in% c("PROBE_ID", "SYMBOL"))
+      ind2 <- which(colnames(final_expression) %in% base_sample_name)
       if(input$uploadprobes == FALSE){
-        exp_base_sam=values$final_expression[,c(ind1,ind2)]
-        des_base_sam=values$design[which(values$design$columnname%in%colnames(exp_base_sam)),]
-        y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+        exp_base_sam <- values$final_expression[, c(ind1, ind2)]
+        des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)), ]
+        y<-dataManipulate(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref_var=values$control_var,ref_level=values$control_val,long=FALSE,keep=TRUE,format="Probes",allsamples=FALSE)
       }
-
       if(input$uploadprobes == TRUE){
         probes <- read.csv(input$probe_select$datapath, header = TRUE)
         probes.vector <- as.character(probes[,1])
         exp_base_sam=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector), c(ind1,ind2)]
         des_base_sam=values$design[which(values$design$columnname%in%colnames(exp_base_sam)),]
-        y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+        y<-dataManipulate(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref_var=values$control_var,ref_level=values$control_val,long=FALSE,keep=TRUE,format="Probes",allsamples=FALSE)
       }
-
       ddm<-values$h2b_rowdendro
       colddm<-values$h2b_coldendro
-
     }
     if (input$set==3){#heatmap1
-
       if(input$uploadprobes == FALSE){
-        y<-data.manipulate(exp=values$final_expression,des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+        y<-dataManipulate(y=values$final_expression,x=values$design,colname="columnname",format="Probes",allsamples=TRUE)
         ddm<-values$h1_rowdendro
         colddm<-values$h1_coldendro
       }
-
       if(input$uploadprobes == TRUE){
         probes <- read.csv(input$probe_select$datapath, header = TRUE)
         probes.vector <- as.character(probes[,1])
-        y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),],des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+        y<-dataManipulate(y=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),],x=values$design,colname="columnname",format="Probes",allsamples=TRUE)
         ddm<-values$h1_rowdendro
         colddm<-values$h1_coldendro
       }
@@ -3764,7 +3766,8 @@ output$Unsupervised <- renderMenu({
     if (input$set==4){#heatmap2
 
       if(input$uploadprobes == FALSE){
-        y<-data.manipulate(exp=values$final_expression,des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+        y <- dataManipulate(y = values$final_expression, x = values$design, colname = "columnname", ref_var = values$control_var, ref_level = values$control_val, long = FALSE, keep = TRUE, format = "Probes", allsamples = FALSE)
+        #y<-data.manipulate(exp=values$final_expression,des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
         ddm<-values$h2_rowdendro
         colddm<-values$h2_coldendro
       }
@@ -3772,23 +3775,24 @@ output$Unsupervised <- renderMenu({
       if(input$uploadprobes == TRUE){
         probes <- read.csv(input$probe_select$datapath, header = TRUE)
         probes.vector <- as.character(probes[,1])
-        y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector), ],des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+        y <- dataManipulate(y = values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector), ], x = values$design, colname = "columnname", ref_var = values$control_var, ref_level = values$control_val, long = FALSE, keep = TRUE, format = "Probes", allsamples = FALSE)
+        #y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector), ],des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$control_var,values$control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
         ddm<-values$h2_rowdendro
         colddm<-values$h2_coldendro
       }
     }
     if(input$set==5){#heatmap3
-
       if(input$uploadprobes == FALSE){
         if(values$hc==TRUE){
           des_w_controls<-values$design[which(values$design$columnname %in% colnames(values$final_expression)),]
           des_wo_controls<-values$design[-which(values$design[,values$control_var]==values$control_val),]
           h5index<-c(1,2,which(colnames(values$final_expression) %in% des_wo_controls$columnname))
-          y<-data.manipulate(exp=values$final_expression[,h5index],des=des_wo_controls,values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+          y<-dataManipulate(y=values$final_expression[,h5index],x=des_wo_controls,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+          #y<-data.manipulate(exp=values$final_expression[,h5index],des=des_wo_controls,values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
         }
-
         if(values$hc==FALSE){
-          y<-data.manipulate(exp=values$final_expression,des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+          y<-dataManipulate(y=values$final_expression,x=values$design,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+          #y<-data.manipulate(exp=values$final_expression,des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
         }
         ddm<-values$h3_rowdendro
         colddm<-values$h3_coldendro
@@ -3802,11 +3806,13 @@ output$Unsupervised <- renderMenu({
           des_w_controls<-values$design[which(values$design$columnname %in% colnames(values$final_expression)),]
           des_wo_controls<-values$design[-which(values$design[,values$control_var]==values$control_val),]
           h5index<-c(1,2,which(colnames(values$final_expression) %in% des_wo_controls$columnname))
-          y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),h5index],des=des_wo_controls,values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+          y<-dataManipulate(y=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),h5index],x=des_wo_controls,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+          #y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),h5index],des=des_wo_controls,values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
         }
 
         if(values$hc==FALSE){
-          y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),],des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+          y<-dataManipulate(y=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),],x=values$design,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+          #y<-data.manipulate(exp=values$final_expression[which(values$final_expression[,names(probes)] %in% probes.vector),],des=values$design[which(values$design$columnname %in% colnames(values$final_expression)),],values$baseline_var,values$baseline_val,longitudinal=TRUE,subjects=values$patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
         }
 
         ddm<-values$h3_rowdendro

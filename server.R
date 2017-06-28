@@ -3952,11 +3952,6 @@ output$Unsupervised <- renderMenu({
     colnames(y$heatexp) <- design_ordered[,values$sample_id]
     colnames(x)<-design_ordered[,values$sample_id]
 
-    if(input$setcutoff!=0){
-      cut1<-as.numeric(input$setcutoff)
-      x[x>cut1]<-cut1
-      x[x<(-cut1)]<--cut1}
-
     if(input$uploadprobes == TRUE){
       if(input$row_cluster == TRUE){
         ddm = as.dendrogram(fastcluster::hclust(dist(x)))
@@ -4188,17 +4183,23 @@ output$Unsupervised <- renderMenu({
   })
 
   output$heatmap <- renderPlot({
+    x <- expression_matrix()$x
+    if(input$setcutoff!=0){
+      cut1<-as.numeric(input$setcutoff)
+      x[x>cut1]<-cut1
+      x[x<(-cut1)]<--cut1
+    }
     if(Allprobes() == FALSE){
       withProgress(message = 'Making plot',
                    detail = 'This may take a while...', value = 1,{
-                     aheatmap2(expression_matrix()$x,Rowv=NA, border_color = "grey60", Colv=opt_NumClust2()$colddm, treeheight = tree_height(), fontsize = font_size(), cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow = NA, breaks=0)
+                     aheatmap2(x,Rowv=NA, border_color = "grey60", Colv=opt_NumClust2()$colddm, treeheight = tree_height(), fontsize = font_size(), cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow = NA, breaks=0)
                    })
     }
 
     if(Allprobes() == TRUE){
       withProgress(message = 'Making plot',
                    detail = 'This may take a while...', value = 1,{
-                     aheatmap2(expression_matrix()$x,Rowv=row.clust(), border_color = "grey60", Colv=opt_NumClust2()$colddm, treeheight = tree_height(), fontsize = font_size(), cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,breaks=0)
+                     aheatmap2(x,Rowv=row.clust(), border_color = "grey60", Colv=opt_NumClust2()$colddm, treeheight = tree_height(), fontsize = font_size(), cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,breaks=0)
                    })
     }
 
@@ -5133,11 +5134,6 @@ output$Unsupervised <- renderMenu({
     y$heatexp <- y$heatexp[, match(design_ordered[,"columnname" ], colnames(y$heatexp), nomatch=0)]
     colnames(y$heatexp) <- design_ordered[,values$sample_id]
     colnames(x)<-design_ordered[,values$sample_id]
-    if(input$setcutoff1!=0){
-      cut1<-as.numeric(input$setcutoff1)
-      x[x>cut1]<-cut1
-      x[x<(-cut1)]<--cut1
-    }
     z = list(x = x, probeids = probeids, y = y, symb = symb)
     return(z)
   })
@@ -5325,16 +5321,22 @@ output$Unsupervised <- renderMenu({
   })
 
   output$heatmap1 <- renderPlot({
+    x <- expression_matrix2()$x
+    if(input$setcutoff1!=0){
+      cut1<-as.numeric(input$setcutoff1)
+      x[x>cut1]<-cut1
+      x[x<(-cut1)]<--cut1
+    }
     if(all(expression_matrix2()$x == 0)){
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
-                     aheatmap2(expression_matrix2()$x,Rowv=row_cluster(),Colv = opt_numClust3()$colddm,cexRow=1.2, treeheight = Treeheight(), fontsize = fontSize(), annheight = leg_size(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0,legend = FALSE)
+                     aheatmap2(x,Rowv=row_cluster(),Colv = opt_numClust3()$colddm,cexRow=1.2, treeheight = Treeheight(), fontsize = fontSize(), annheight = leg_size(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0,legend = FALSE)
                    })
     }
     else{
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
-                     aheatmap2(expression_matrix2()$x,Rowv=row_cluster(),Colv = opt_numClust3()$colddm, cexRow=1.2, treeheight = Treeheight(), fontsize = fontSize(), annheight = leg_size(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0)
+                     aheatmap2(x,Rowv=row_cluster(),Colv = opt_numClust3()$colddm, cexRow=1.2, treeheight = Treeheight(), fontsize = fontSize(), annheight = leg_size(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0)
                    })
     }
   }, height = plotsize_H, width = plotsize_W)
@@ -9000,10 +9002,6 @@ output$Module_Select <- renderUI({
     y$heatexp <- y$heatexp[, match(design_ordered[,"columnname" ], colnames(y$heatexp), nomatch=0)]
     colnames(y$heatexp) <- design_ordered[,values$m_sample_id]
     colnames(x)<-design_ordered[,values$m_sample_id]
-    if(input$setcutoff2!=0){
-      cut1<-as.numeric(input$setcutoff2)
-      x[x>cut1]<-cut1
-      x[x<(-cut1)]<--cut1}
     z = list(x = x, y = y)
     return(z)
   })
@@ -9129,16 +9127,22 @@ output$Module_Select <- renderUI({
   })
 
   output$heatmapm <- renderPlot({
+    x <- expression_matrixm()$x
+    if(input$setcutoff2!=0){
+      cut1<-as.numeric(input$setcutoff2)
+      x[x>cut1]<-cut1
+      x[x<(-cut1)]<--cut1
+    }
     if(all(expression_matrixm()$x == 0)){
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
-                     aheatmap2(expression_matrixm()$x,Rowv=row_clusterm(),Colv = opt_numClustm()$colddm,cexRow=1.2, treeheight = Treeheightm(), fontsize = fontSizem(), annheight = leg_sizem(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0,legend = FALSE)
+                     aheatmap2(x,Rowv=row_clusterm(),Colv = opt_numClustm()$colddm,cexRow=1.2, treeheight = Treeheightm(), fontsize = fontSizem(), annheight = leg_sizem(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0,legend = FALSE)
                    })
     }
     else{
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
-                     aheatmap2(expression_matrixm()$x,Rowv=row_clusterm(),Colv = opt_numClustm()$colddm, cexRow=1.2, treeheight = Treeheightm(), fontsize = fontSizem(), annheight = leg_sizem(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0)
+                     aheatmap2(x,Rowv=row_clusterm(),Colv = opt_numClustm()$colddm, cexRow=1.2, treeheight = Treeheightm(), fontsize = fontSizem(), annheight = leg_sizem(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0)
                    })
     }
   }, height = plotsize_mH, width = plotsize_mW)

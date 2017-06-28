@@ -4290,8 +4290,14 @@ output$Unsupervised <- renderMenu({
   output$downloadModPlot4 <- downloadHandler(
     filename = function() {paste('ProbeLevel_Heatmap','.png', sep = '')},
     content = function(file){
+      x <- expression_matrix()$x
+      if(input$setcutoff!=0){
+        cut1<-as.numeric(input$setcutoff)
+        x[x>cut1]<-cut1
+        x[x<(-cut1)]<--cut1
+      }
       png(file, width = (plotresolution2()/72)*plot_width(), height = (plotresolution2()/72)*plot_height(), res = plotresolution2())
-      print(aheatmap2(expression_matrix()$x,Rowv=NA,Colv=opt_NumClust2()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow=NA,breaks=0))
+      print(aheatmap2(x,Rowv=NA,Colv=opt_NumClust2()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow=NA,breaks=0))
       dev.off()
     }
   )
@@ -5327,7 +5333,7 @@ output$Unsupervised <- renderMenu({
       x[x>cut1]<-cut1
       x[x<(-cut1)]<--cut1
     }
-    if(all(expression_matrix2()$x == 0)){
+    if(all(x == 0)){
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
                      aheatmap2(x,Rowv=row_cluster(),Colv = opt_numClust3()$colddm,cexRow=1.2, treeheight = Treeheight(), fontsize = fontSize(), annheight = leg_size(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0,legend = FALSE)
@@ -5344,8 +5350,14 @@ output$Unsupervised <- renderMenu({
   output$downloadHeatmap2 <- downloadHandler(
     filename = function() {paste('SignificantProbes_Heatmap','.png', sep = '')},
     content = function(file){
+      x <- expression_matrix2()$x
+      if(input$setcutoff1!=0){
+        cut1<-as.numeric(input$setcutoff1)
+        x[x>cut1]<-cut1
+        x[x<(-cut1)]<--cut1
+      }
       png(file, width = plotsize_W(), height = plotsize_H(), res = resolution())
-      print(aheatmap2(expression_matrix2()$x,Rowv=TRUE,Colv=opt_numClust3()$colddm,cexRow=1.2, treeheight = input$DGE_TreeHeight, fontsize = input$DGE_FontSize, annheight = input$DGE_LegendSize, color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0))
+      print(aheatmap2(x,Rowv=TRUE,Colv=opt_numClust3()$colddm,cexRow=1.2, treeheight = input$DGE_TreeHeight, fontsize = input$DGE_FontSize, annheight = input$DGE_LegendSize, color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors2()$groups,annColors= heatmap_colors2()$first_color,labRow=NA,breaks=0))
       dev.off()
     }
   )
@@ -9133,7 +9145,7 @@ output$Module_Select <- renderUI({
       x[x>cut1]<-cut1
       x[x<(-cut1)]<--cut1
     }
-    if(all(expression_matrixm()$x == 0)){
+    if(all(x == 0)){
       withProgress(message = '',
                    detail = 'Generating the Options...', value = 1,{
                      aheatmap2(x,Rowv=row_clusterm(),Colv = opt_numClustm()$colddm,cexRow=1.2, treeheight = Treeheightm(), fontsize = fontSizem(), annheight = leg_sizem(), color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0,legend = FALSE)
@@ -9150,8 +9162,14 @@ output$Module_Select <- renderUI({
   output$downloadHeatmapm <- downloadHandler(
     filename = function() {paste('SignificantMetab_Heatmap','.png', sep = '')},
     content = function(file){
+      x <- expression_matrixm()$x
+      if(input$setcutoff2!=0){
+        cut1<-as.numeric(input$setcutoff2)
+        x[x>cut1]<-cut1
+        x[x<(-cut1)]<--cut1
+      }
       png(file, width = plotsize_mW(), height = plotsize_mH(), res = resolutionm())
-      print(aheatmap2(expression_matrixm()$x,Rowv=TRUE,Colv=opt_numClustm()$colddm,cexRow=1.2, treeheight = input$Metab_TreeHeight, fontsize = input$Metab_FontSize, annheight = input$Metab_LegendSize, color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0))
+      print(aheatmap2(x,Rowv=TRUE,Colv=opt_numClustm()$colddm,cexRow=1.2, treeheight = input$Metab_TreeHeight, fontsize = input$Metab_FontSize, annheight = input$Metab_LegendSize, color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colorsm()$groups,annColors= heatmap_colorsm()$first_color,labRow=NA,breaks=0))
       dev.off()
     }
   )

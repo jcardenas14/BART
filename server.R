@@ -4297,7 +4297,12 @@ output$Unsupervised <- renderMenu({
         x[x<(-cut1)]<--cut1
       }
       png(file, width = (plotresolution2()/72)*plot_width(), height = (plotresolution2()/72)*plot_height(), res = plotresolution2())
-      print(aheatmap2(x,Rowv=NA,Colv=opt_NumClust2()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow=NA,breaks=0))
+      if(Allprobes() == TRUE){
+        print(aheatmap2(x,Rowv=row.clust(), border_color = "grey60", Colv=opt_NumClust2()$colddm, treeheight = tree_height(), fontsize = font_size(), cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,breaks=0))
+      }
+      if(Allprobes() == FALSE){
+        print(aheatmap2(x,Rowv=NA,Colv=opt_NumClust2()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow=1.2, annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(50),annCol = heatmap_colors()$groups,annColors= heatmap_colors()$first_color,labRow=NA,breaks=0))
+      }
       dev.off()
     }
   )

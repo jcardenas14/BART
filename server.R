@@ -7128,7 +7128,7 @@ output$Module_Select <- renderUI({
       else{
         line_colors = input$ColorChoice1
       }
-      qusage_plot = ggplot(data = comp_subset1, aes(x = Index, y = Log2FC, ymin = ylow, ymax = yhigh))
+      qusage_plot = ggplot(data = comp_subset1, aes(x = factor(Index), y = Log2FC, ymin = ylow, ymax = yhigh))
       qusage_plot = qusage_plot + scale_x_discrete(breaks = 1:length(comp_subset1$Index), labels = as.character.factor(comp_subset1$pathway.name[comp_subset1$Index]))
       qusage_plot = qusage_plot + xlab("Modules") + ylab("Pathway Activity")
       qusage_plot = qusage_plot + scale_colour_manual(values = line_colors) + geom_line(aes(colour = Comparison, group = Comparison), size = 1) + geom_hline(yintercept = 0, colour = "black", size = .5)

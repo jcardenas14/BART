@@ -3995,6 +3995,8 @@ output$Unsupervised <- renderMenu({
     hcl = fastcluster::hclust(dist_x)
     if(input$ColClustProbe == TRUE){
       colddm <- as.dendrogram(hcl)
+      Rowv <- rowMeans(dist_x, na.rm = T)
+      colddm <- reorder(colddm, Rowv)
     }
     d = sapply(2:round(nrow(design_ordered)/2), function(y) clValid::dunn(dist_x, cutree(hcl,y)))
     opt_num = which(d == max(d)) + 1

@@ -4391,7 +4391,7 @@ output$Unsupervised <- renderMenu({
     if(is.null(values$ModulesTF) == FALSE){
       if(values$ModulesTF == TRUE){
         return(tabsetPanel(id="start",
-
+                    tags$style("#LMMmodule.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}"),         
                     tabPanel(style="height: 80vh; overflow: auto","DGE: Gene Lists", downloadButton("download_modmap_comparison", "Download Figure"), uiOutput('modmap_comparison2'),#plotOutput("modmap_comparison"),
                              helpText("Right click on hyperlinks to open in new window"),
                              downloadButton('downloadData', 'Download Table'),

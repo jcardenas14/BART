@@ -444,7 +444,7 @@ body <-  dashboardBody(
                                  
                 )),
                 
-                mainPanel(
+                mainPanel(style = "overflow-x: auto",
                   tabsetPanel(id="start11",
                               
                               tabPanel('Individual Longitudinal Module Map',
@@ -462,7 +462,7 @@ body <-  dashboardBody(
                                        textOutput('OptimalNumber2'),
                                        downloadButton('downloadModMap3', 'Download Data'),
                                        downloadButton("downloadModPlot3", "Download Figure"),
-                                       div(style = "overflow-x: auto", plotOutput('modmap3')),
+                                       plotOutput('modmap3'),
                                        plotOutput('modmap3plus')),
                               
                               tabPanel('Cluster Number Diagnostics',

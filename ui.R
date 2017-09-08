@@ -26,6 +26,7 @@ sidebar <- dashboardSidebar(
 )
 
 body <-  dashboardBody(
+	tags$style("#modmap3.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}"),
   shinyjs::useShinyjs(),
   tabItems(
     uiOutput("css_colors"),
@@ -444,7 +445,7 @@ body <-  dashboardBody(
                                  
                 )),
                 
-                mainPanel(style = "overflow-x: auto",
+                mainPanel(
                   tabsetPanel(id="start11",
                               
                               tabPanel('Individual Longitudinal Module Map',

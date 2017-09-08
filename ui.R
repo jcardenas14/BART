@@ -26,7 +26,8 @@ sidebar <- dashboardSidebar(
 )
 
 body <-  dashboardBody(
-	tags$style("#modmap3.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}"),
+	tags$style("#modmap3.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
+                    #LMMmodule.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}"),
   shinyjs::useShinyjs(),
   tabItems(
     uiOutput("css_colors"),

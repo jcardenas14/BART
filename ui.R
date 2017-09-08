@@ -462,7 +462,7 @@ body <-  dashboardBody(
                                        textOutput('OptimalNumber2'),
                                        downloadButton('downloadModMap3', 'Download Data'),
                                        downloadButton("downloadModPlot3", "Download Figure"),
-                                       plotOutput('modmap3'),
+                                       div(style = "overflow-x: auto", plotOutput('modmap3')),
                                        plotOutput('modmap3plus')),
                               
                               tabPanel('Cluster Number Diagnostics',

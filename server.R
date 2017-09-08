@@ -4549,7 +4549,7 @@ output$Unsupervised <- renderMenu({
                            tableOutput('cluster_tab4'),
                            textOutput('chisquare_test5'),
                            textOutput('fisher5')),
-                  tabPanel(style="height: 80vh; overflow: auto","DGE: Module Analysis Overview",
+                  tabPanel("DGE: Module Analysis Overview",
                             downloadButton('downloadLMMModMap', 'Download Data'),
                             downloadButton('downloadLMMModMap2', 'Download Figure'),
                             uiOutput("LMMmodule_text"),

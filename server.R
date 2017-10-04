@@ -805,7 +805,7 @@ output$Unsupervised <- renderMenu({
       dat <- 100*(values$long_base-1)
     } 
     if(input$baseOrCtrl == "With Respect to Controls"){
-      if(!is.null(values$base_ctrl)){
+      if(!is.null(values$base_ctrl) & is.null(values$long_ctrl)){
         dat <- 100*(values$base_ctrl-1)
       } else{
         dat <- 100*(values$long_ctrl-1) 

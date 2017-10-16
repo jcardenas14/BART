@@ -18,7 +18,7 @@
 library(ggplot2)
 
 tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
-  box(title = "Filtering Options", width = 4, status = "info", solidHeader = TRUE,
+  box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
       uiOutput("Comparison1"),
       filterOptsUI("dgeResultsTable"),
       #checkboxInput("merge", "Merge module information", FALSE),
@@ -30,7 +30,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
                        downloadButton('downloadSelComp', 'Download selected genelists')
       )
   ),
-  box(title = "Results Table", width = 8, status = "success", solidHeader = TRUE,
+  box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
       uiOutput('downloadModMap'),
       uiOutput('moduleMap'),
       helpText("Right click on hyperlinks to open in new window"),
@@ -38,13 +38,13 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       dataTableOutput("genelisttable")
   )
 )), list(Title = "Diagnostics", Content = fluidRow(
-  box(title = "P-Value Distribution Assesment", width = 12, status = "info", solidHeader = TRUE,
+  box(title = "P-Value Distribution Assesment", width = 12, status = "primary", solidHeader = FALSE,
       plotOutput("distplot"), plotOutput("genelistgraph"), 
       textOutput("intro"),
       dataTableOutput("numtable")
   )
 )), list(Title = "Significant Variables Heatmap", Content = fluidRow(
-  box(title = "Heatmap Options", width = 4, status = "info", solidHeader = TRUE,
+  box(title = "Heatmap Options", width = 4, status = "primary", solidHeader = FALSE,
       div(style = "display:inline-block", actionButton("go2", "Plot")),
       div(style = "display:inline-block", infoPopup("Plot", 'The heatmap will not update until the "Plot" button is clicked.
                                                     This allows the user to make multiple adjustments at once, without having to wait for 
@@ -64,7 +64,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       br(),
       graphOptionsUI("dgeGraphOptions")
       ),
-  box(title = "Heatmap", width = 8, status = "warning", solidHeader = TRUE,
+  box(title = "Heatmap", width = 8, status = "primary", solidHeader = FALSE,
       infoPopup("Help Message", 'The heat map below is constructed on individual samples for a number of scenarios,
                 specifically for baseline samples only (cross sectional) or all samples at all time points.  For baseline samples,
                 heatmaps can be generated based on normalizing the expression data to the median, or to a control group if applicable.
@@ -84,7 +84,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       plotOutput("heatmap1")
   )
   )), list(Title = "Venn Diagram", Content =  fluidRow(
-    box(title = "Options", width = 4, status = "info", solidHeader = TRUE,
+    box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
         filterOptsUI("dgeVenn"),
         uiOutput("vennComparison"),
         selectInput("UorI", "Intersection or union:", c("Intersection" = 1, "Union" = 2), selected = 1),
@@ -92,17 +92,17 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
         uiOutput("exclude")
     ),
     column(width = 8,
-           box(title = "Venn Diagram", width = NULL, status = "warning", solidHeader = TRUE,
+           box(title = "Venn Diagram", width = NULL, status = "primary", solidHeader = FALSE,
                downloadButton('downloadVennPic', 'Download Figure'),
                plotOutput("vennDiagram")
            ),
-           box(title = "Venn Results Table", width = NULL, status = "success", solidHeader = TRUE,
+           box(title = "Venn Results Table", width = NULL, status = "primary", solidHeader = FALSE,
                downloadButton('downloadVennData', 'Download Data'),
                dataTableOutput("vennIntersection")
            )
     )
   )), list(Title = "Modular DGE Analysis", Content =  fluidRow(
-    box(title = "Options", width = 4, status = "info", solidHeader = TRUE,
+    box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
         actionButton("goModDge", "Plot"),
         br(),
         div(style = "display:inline-block", checkboxInput(inputId = "compSelect", label = strong("Comparison(s) selection:", style = "color:blue"), value = FALSE)),
@@ -128,7 +128,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
         br(),
         graphOptionsUI("modDgeGraphOptions", varType = "modules")
         ),
-    box(title = "Module DGE Heatmap", width = 8, status = "warning", solidHeader = TRUE,
+    box(title = "Module DGE Heatmap", width = 8, status = "primary", solidHeader = FALSE,
         downloadButton('downloadModDgeData', 'Download Data'),
         downloadButton('downloadModDgeMap', 'Download Figure'),
         plotOutput("modDgeMap")
@@ -202,15 +202,14 @@ shinyServer(function(input,output, session){
     values$results_file <- NULL
     values$mod1 <- NULL
     values$mod2 <- NULL
-    values$illumina <- NULL
     values$moduleinfo2 <- NULL
     values$correlations <- NULL
     values$ModulesTF <- NULL
     values$baylorMod <- TRUE
-    values$BaylorTF <- NULL
     values$base_ctrl <- NULL
     values$long_ctrl <- NULL
     values$long_base <- NULL
+    values$modules <- NULL
     values$roast_results <- NULL
     values$numbGenes <- NULL
     values$PaloValue <- NULL
@@ -1365,11 +1364,29 @@ output$Unsupervised <- renderMenu({
   })
 
   sig_ind <- reactive({
-    dat <- callModule(filterOpts, "modDgeMap", data = reactive(values$results_file), data.type = "percents", geneList = reactive(moduleinfo1))
-    prop_matrix <- dat$prop_matrix
-    prop_matrix2 <- dat$prop_matrix2
-    z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
-    return(z)
+    if(!is.null(values$modules)){
+      genes <- unlist(values$modules)
+      gsetNames <- rep(names(values$modules), times = lapply(values$modules, length))
+      modinfo <- data.frame(Module = gsetNames, PROBE_ID = genes)
+      if(input$dgeResults == "Modular DGE Analysis"){
+        dat <- callModule(filterOpts, "modDgeMap", data = reactive(values$results_file), data.type = "percents", geneList = reactive(modinfo))
+      }
+      if(input$dgeResults == "Gene Lists"){
+        dat <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), data.type = "percents", geneList = reactive(modinfo))
+      }
+      modnames<-unique(moduleinfo$Module)[-1]
+      modnum<-gsub("M","",modnames)
+      modvec<-as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
+      modmat<-matrix(modvec,ncol=2,byrow=T)
+      modordnum<-table(factor(moduleinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
+      mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
+      prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),]
+      prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),]
+      z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
+      return(z)
+    } else{
+      return(NULL)
+    }
   })
   
   ModMap_Comparison <- reactive({
@@ -1388,7 +1405,7 @@ output$Unsupervised <- renderMenu({
       for (i in 1:length(x)){d<-c(d,rep(odd[9-i],x[i]))}
       return(d)
     }
-    colorvar = sig_ind()$prop_matrix[1:97,input$comparison]+1
+    colorvar = sig_ind()$prop_matrix2[1:97,input$comparison]
     colgrp <- findInterval(colorvar,seq(0,2,length.out=10))
     colfunc <- colorRampPalette(c("blue","white", "red"))
     collist <- colfunc(length(unique(colgrp)))
@@ -1397,7 +1414,7 @@ output$Unsupervised <- renderMenu({
     df2 <- data.frame(
       x = numgen(c(2,3,6,16,15,20,20,15)),
       y = c(numgen2(c(2,3,6,16,15,20,20,15))),
-      z = mycolors
+      proportion = mycolors
     )
     test<-ggplot(df2, aes(xmin=x-1,xmax=x+1,ymin=y-1,ymax=y+1),environment=environment())+
       theme(axis.ticks.x=element_blank(),axis.ticks.y=element_blank(),panel.grid.major = element_blank()
@@ -1407,9 +1424,10 @@ output$Unsupervised <- renderMenu({
       scale_x_continuous(breaks=(2*(1:20)-1),labels=1:20,limits=c(0,40))
     
     test2<-test+coord_cartesian(xlim = c(0, 40), ylim=c(0, 16))
-    test3<-test2+geom_point(aes(x=x,y=y,size=500,colour=z))+
-      scale_colour_gradient2(low="blue", high="red", guide="colorbar",midpoint=1)+
-      theme(axis.title.x=element_blank(),axis.title.y=element_blank(),legend.position = "none") + scale_size_continuous(limits=c(1,500))
+    test3<-test2+geom_point(aes(x=x,y=y,colour=proportion,size=500))+
+      scale_colour_gradient2(low="blue", high="red", guide="colorbar",midpoint=0, limits = c(-1,1))+ 
+      theme(axis.title.x=element_blank(),axis.title.y=element_blank()) + scale_size_continuous(limits=c(1,500)) + 
+      guides(size = FALSE) 
     
     if(is.null(values$ModulesTF) == FALSE){
       if(values$ModulesTF == FALSE){return(NULL)}
@@ -1834,7 +1852,7 @@ output$Unsupervised <- renderMenu({
   })
   
   modDgeData <- eventReactive(input$goModDge,{
-    dat <- sig_ind()$prop_matrix
+    dat <- sig_ind()$prop_matrix2
     ddm <- NA
     colddm <- NA
     if(input$compSelect){
@@ -2201,13 +2219,6 @@ output$Unsupervised <- renderMenu({
     }
     bonf <- unlist(bonf)
     master$Bonf <- bonf
-    if(!is.null(values$illumina)){
-      if(values$illumina == FALSE){
-        if(is.null(values$moduleinfo2)){
-          master$pathway.name <- gsub("_", ".", master$pathway.name)
-        }
-      }
-    }
     n2 <- length(module_annotations[,1])
     mod.ann <- list()
     master$Modulev2_Annotation <- ""
@@ -2217,52 +2228,11 @@ output$Unsupervised <- renderMenu({
     for(i in 1:n2){
       master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(module_annotations[,2][i])
     }
-    if(is.null(values$BaylorTF)){
-      mod.annot <- module_annotations
-      mod.annot <- mod.annot[match(master$pathway.name[which(master$pathway.name %in% mod.annot$Module)], mod.annot$Module, nomatch = 0),]
-      master$pathway.name <- as.character(master$pathway.name)
-      master$pathway.name[which(master$pathway.name %in% mod.annot$Module)] <- paste(mod.annot$Modulev2_Annotation,mod.annot$Module,sep=" ")
-      master$pathway.name <- as.factor(master$pathway.name)
-    }
     return(master)
   })
 
   mod_list <- reactive({
-    if(is.null(values$illumina) == FALSE){
-      if(values$illumina == FALSE){
-        if(is.null(values$moduleinfo2)){
-          modnames<-unique(moduleinfo2$Module)
-          y<-unlist(strsplit(as.character(modnames),".",fixed=TRUE))
-          y <- unlist(modnames)
-          y<-matrix(y,byrow=T,nrow=260,ncol=2)
-          sortmodnames<-as.character(modnames)[order(y[,1],y[,2])]
-          Modulelist<-list(as.character(moduleinfo2$SYMBOL[which(moduleinfo2$Module==sortmodnames[1])]),as.character(moduleinfo2$SYMBOL[which(moduleinfo2$Module==sortmodnames[2])]))
-          for(i in 3:length(sortmodnames)){Modulelist<-c(Modulelist,list(as.character(moduleinfo2$SYMBOL[which(moduleinfo2$Module==sortmodnames[i])])))}
-          names(Modulelist)<-sortmodnames
-        }
-        else{
-          modnames<-unique(values$moduleinfo2$Module)
-          y<-unlist(strsplit(as.character(modnames),".",fixed=TRUE))
-          y<-matrix(y,byrow=T,nrow=260,ncol=2)
-          sortmodnames<-as.character(modnames)[order(y[,1],y[,2])]
-          Modulelist<-list(as.character(values$moduleinfo2$SYMBOL[which(values$moduleinfo2$Module==sortmodnames[1])]),as.character(values$moduleinfo2$SYMBOL[which(values$moduleinfo2$Module==sortmodnames[2])]))
-          for(i in 3:length(sortmodnames)){Modulelist<-c(Modulelist,list(as.character(values$moduleinfo2$SYMBOL[which(values$moduleinfo2$Module==sortmodnames[i])])))}
-          names(Modulelist)<-sortmodnames
-        }
-      }
-      else{
-        Modulelist <- Modulelist
-        mod.anno <- names(Modulelist)[which(names(Modulelist) %in% module_annotations[,1])]
-        module_annotations2 <- module_annotations[match(mod.anno, module_annotations[,1], nomatch=0),]
-        names(Modulelist)[which(names(Modulelist) %in% module_annotations2[,1])] <- paste(module_annotations2[,2], module_annotations2[,1], sep=" ")
-      }
-    }
-    if(is.null(values$illumina)){
-      Modulelist <- Modulelist
-      mod.anno <- names(Modulelist)[which(names(Modulelist) %in% module_annotations[,1])]
-      module_annotations2 <- module_annotations[match(mod.anno, module_annotations[,1], nomatch=0),]
-      names(Modulelist)[which(names(Modulelist) %in% module_annotations2[,1])] <- paste(module_annotations2[,2], module_annotations2[,1], sep=" ")
-    }
+    Modulelist <- values$gene_sets
     return(Modulelist)
   })
 
@@ -2673,19 +2643,19 @@ output$Module_Select <- renderUI({
   output$MultipleCompTab <- renderDataTable({
     if(is.null(master())){return(NULL)}
     if(input$only_annotated){
-      if(is.null(values$BaylorTF)){
-        comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
-        comp_subset1$pathway.name <- as.character(comp_subset1$pathway.name)
-        annot <- which(paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ") %in% comp_subset1()$pathway.name)
-      }
-      else{
-        if(values$BaylorTF == TRUE){
-          comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
-        }
-        else{
-          comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% module_annotations$Module),]
-        }
-      }
+      #if(is.null(values$BaylorTF)){
+        #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
+        #comp_subset1$pathway.name <- as.character(comp_subset1$pathway.name)
+        #annot <- which(paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ") %in% comp_subset1()$pathway.name)
+      #}
+      #else{
+        #if(values$BaylorTF == TRUE){
+          #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
+        #}
+        #else{
+          #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% module_annotations$Module),]
+        #}
+      #}
     }
     else{
       comp_subset1 <- comp_subset1()
@@ -3636,20 +3606,72 @@ output$Module_Select <- renderUI({
   })
 
   output$TypeVariable <- renderUI({
-    selectInput("TypeVariable1", "Choose type:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable1", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
 
   output$TypeVariable2 <- renderUI({
-    selectInput("TypeVariable3", "Choose type:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable3", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
 
   output$TypeVariable4 <- renderUI({
-    selectInput("TypeVariable5", "Choose type:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable5", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
 
   output$TypeVariable6 <- renderUI({
-    selectInput("TypeVariable7", "Choose type:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable7", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
+  
+  output$var_switch <- renderUI({
+    checkboxInput("var_switch", strong(paste0("Change Figure Rows to ", values$x_var[which(values$correlation_names == input$TypeVariable1)])), value = FALSE)
+  })
+  
+  corrResultsOverview <- reactive({
+    correlations <- results <- Raw <- FDR <- Bonf <- list()
+    for(i in 1:length(values$correlations)){
+      corrs <- data.table::as.data.table(values$correlations[[i]])
+      corrs$FDR <- 1
+      corrs$Bonf <- 1
+      corrs[,FDR := p.adjust(Raw.P.Value, method = "fdr"), by = c(names(corrs)[c(2,3)])]
+      corrs[,Bonf := p.adjust(Raw.P.Value, method = "bonferroni"), by = c(names(corrs)[c(2,3)])]
+      corrs <- as.data.frame(corrs)
+      comps <- raw <- fdr <- bonf <- c()
+      for(j in 1:length(unique(values$correlations[[i]][,3]))){
+        comps[j] <- paste0(values$correlation_names[i],"_",as.character(unique(values$correlations[[i]][,3])[j]))
+        corrs.sub <- corrs[corrs[,3] == unique(corrs[,3])[j],]
+        if(input$overviewCorrVal){
+          if(input$selectCorrSign == "+"){
+            corrs.sub <- corrs.sub[corrs.sub[,4] > input$selectCorrVal,]
+          } else if(input$selectCorrSign == "-"){
+            corrs.sub <- corrs.sub[corrs.sub[,4] < -input$selectCorrVal,]
+          } else{
+            corrs.sub <- corrs.sub[corrs.sub[,4] < -input$selectCorrVal | corrs.sub[,4] > input$selectCorrVal,]
+          }
+        }
+        raw[j] <- length(which(corrs.sub$Raw.P.Value <= input$alphaCorr))
+        fdr[j] <- length(which(corrs.sub$FDR <= input$alphaCorr))
+        bonf[j] <- length(which(corrs.sub$Bonf <= input$alphaCorr))
+      }
+      results[[i]] <- data.frame(Correlation_Comparisons = comps, Raw = raw, FDR = fdr, Bonf = bonf)
+      correlations[[i]] <- corrs
+    }
+    results <- do.call("rbind", results)
+    z <- list(correlations = correlations, results = results)
+  })
+  
+  output$corrOverview <- renderDataTable({
+    withProgress(message = 'Making Results Table',
+                 detail = 'This may take a while...', value = .1,{
+                   corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),]
+                 }
+    )
+  })
+  
+  output$downloadOverviewCorrTable <- downloadHandler(
+    filename = function() {paste(values$project_name, "_", "Correlation_Results_Overview_Table.csv")},
+    content = function(file) {
+      write.csv(corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),], file, row.names = FALSE)
+    }
+  )
 
   output$subsetcorr <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
@@ -3657,12 +3679,10 @@ output$Module_Select <- renderUI({
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract),]
-
     visit.name = colnames(correlations)[3]
     visit <- unique(correlations[,3])
     visit <- gtools::mixedsort(as.character(visit))
-    selectInput("subsetcorr1", paste("Subset by", " ",visit.name,":",sep = ""), choices = visit, selected = visit, multiple = TRUE)
+    selectInput("subsetcorr1", "", choices = visit, selected = visit, multiple = TRUE)
   })
 
   output$WithVariable1 <- renderUI({
@@ -3671,7 +3691,7 @@ output$Module_Select <- renderUI({
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    selectInput("WithVariable", "Choose 'with' variable:", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = gtools::mixedsort(unique(correlations$With))[1], multiple = TRUE)
+    selectInput("WithVariable", "Choose Correlation Variable(s):", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = gtools::mixedsort(unique(correlations$With))[1], multiple = TRUE)
   })
 
   output$WithVariable2 <- renderUI({
@@ -3680,35 +3700,24 @@ output$Module_Select <- renderUI({
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    selectInput("WithVariable3", "Choose 'with' variable:", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
+    selectInput("WithVariable3", "Choose Correlation Variable(s):", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
 
   output$corr_Variable <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    selectInput("corr_Variable2", paste("Choose", values$y_var, "variable:", sep = " "), choices = as.character(gtools::mixedsort(unique(correlations$Variable))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
+    selectInput("corr_Variable2", paste("Choose", values$y_var[which(values$correlation_names == input$TypeVariable7)], "Variable:", sep = " "), choices = as.character(gtools::mixedsort(unique(correlations$Variable))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
 
   output$WithVariable4 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    selectInput("WithVariable5", "Choose 'with' variable:", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
+    selectInput("WithVariable5", paste("Choose ", values$x_var[which(values$correlation_names == input$TypeVariable7)], " Variable:", sep = ""), choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
 
   output$uploadmod1 <- renderUI({
     if(input$var_switch == FALSE){
-      if(values$y_var[which(values$correlation_names == input$TypeVariable1)] == "Flow"){
-        return(checkboxInput("uploadmod", strong(paste("Upload"," ",tolower(values$y_var[which(values$correlation_names == input$TypeVariable1)])," ", "variables",":",sep = ""), style = "color:blue"), FALSE))
-      }
-      else{
-        return(checkboxInput("uploadmod", strong(paste("Upload"," ",tolower(values$y_var[which(values$correlation_names == input$TypeVariable1)]),"s",":",sep = ""), style = "color:blue"), FALSE))
-      }
-    }
-    else{
-      if(values$x_var[which(values$correlation_names == input$TypeVariable1)] == "Flow"){
-        return(checkboxInput("uploadmod", strong(paste("Upload"," ",tolower(values$y_var[which(values$correlation_names == input$TypeVariable1)])," ", "variables",":",sep = ""), style = "color:blue"), FALSE))
-      }
-      else{
-        return(checkboxInput("uploadmod", strong(paste("Upload"," ",tolower(values$x_var[which(values$correlation_names == input$TypeVariable1)]),"s",":",sep = ""), style = "color:blue"), FALSE))
-      }
+      return(checkboxInput("uploadmod", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
+    } else{
+      return(checkboxInput("uploadmod", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
 
@@ -3723,20 +3732,9 @@ output$Module_Select <- renderUI({
 
   output$uploadmod3 <- renderUI({
     if(input$var_switch3 == FALSE){
-      if(values$y_var[which(values$correlation_names == input$TypeVariable5)] == "Flow"){
-        return(checkboxInput("uploadmod2", strong(paste("Upload"," ",tolower(values$y_var[which(values$correlation_names == input$TypeVariable5)])," ", "variables",":",sep = ""), style = "color:blue"), FALSE))
-      }
-      else{
-        return(checkboxInput("uploadmod2", strong(paste("Upload"," ",tolower(values$y_var[which(values$correlation_names == input$TypeVariable5)]),"s",":",sep = ""), style = "color:blue"), FALSE))
-      }
-    }
-    else{
-      if(values$x_var[which(values$correlation_names == input$TypeVariable5)] == "Flow"){
-        return(checkboxInput("uploadmod2", strong(paste("Upload"," ",tolower(values$x_var[which(values$correlation_names == input$TypeVariable5)])," ", "variables",":",sep = ""), style = "color:blue"), FALSE))
-      }
-      else{
-        return(checkboxInput("uploadmod2", strong(paste("Upload"," ",tolower(values$x_var[which(values$correlation_names == input$TypeVariable5)]),"s",":",sep = ""), style = "color:blue"), FALSE))
-      }
+      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
+    } else{
+      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
 
@@ -3749,44 +3747,16 @@ output$Module_Select <- renderUI({
     }
   })
 
-  h.dat <- reactive({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
-    correlation.type <- colnames(correlations)[4]
-
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract),]
-    correlations <- data.table::as.data.table(correlations)
-    correlations$FDR <- 1
-    correlations$Bonf <- 1
-    correlations[,FDR := p.adjust(Raw.P.Value, method = "fdr"), by = c(names(correlations)[c(2,3)])]
-    correlations[,Bonf := p.adjust(Raw.P.Value, method = "bonferroni"), by = c(names(correlations)[c(2,3)])]
-
-    correlations <- as.data.frame(correlations)
-    z <- list(correlations = correlations)
-  })
-
   heatmap.data <- reactive({
-
-    if(input$uploadmod == FALSE){
-      correlations <- h.dat()$correlations
-      if(input$var_switch){
-        correlations <- correlations[,c(2,1,3:ncol(correlations))]
-        colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
-      }
+    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable1)]]
+    if(input$var_switch == TRUE){
+      correlations <- correlations[,c(2,1,3:ncol(correlations))]
+      colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-
     if(input$uploadmod == TRUE){
-      correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
-      if(input$var_switch == TRUE){
-        correlations <- correlations[,c(2,1,3:ncol(correlations))]
-        colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
-      }
-      correlation.type <- colnames(correlations)[4]
-
       modnames.corr <- read.csv(input$modselect$datapath, header = TRUE)
       modnames.corr <- as.character(modnames.corr[,1])
       modnames.corr <- gsub(".", "_", modnames.corr,fixed = TRUE)
-
-      correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract),]
       correlations <- correlations[which(correlations$Variable %in% modnames.corr),]
 
       col_anno <- list()
@@ -3831,18 +3801,13 @@ output$Module_Select <- renderUI({
       }
 
       col_anno <- data.frame(unlist(col_anno2))
-      colnames(col_anno)[1] <- paste(values$x_var, "variable", sep = " ")
+      colnames(col_anno)[1] <- paste(values$x_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+      if(input$var_switch){
+        colnames(col_anno)[1] <- paste(values$y_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+      }
       dat <- do.call("cbind", dat2)
       z <- list(col_anno = col_anno, dat = dat)
-    }
-
-    else{
-      correlations <- h.dat()$correlations
-      if(input$var_switch){
-        correlations <- correlations[,c(2,1,3:ncol(correlations))]
-        colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
-      }
-
+    } else{
       dat3 <- list()
       colnames3 <- list()
       rownames3 <- list()
@@ -3953,10 +3918,8 @@ output$Module_Select <- renderUI({
       dat <- do.call("cbind", dat2)
       col_anno <- as.data.frame(unlist(col_anno2))
       colnames(col_anno)[1] <- paste(values$x_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
-      if(input$ordercorr == TRUE){
-        order_time <- mixedorder(colnames(dat))
-        dat <- dat[,order_time]
-        col_anno <- as.data.frame(col_anno[order_time,,drop = F])
+      if(input$var_switch){
+        colnames(col_anno)[1] <- paste(values$y_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
       }
       z <- list(col_anno = col_anno, dat = dat)
     }
@@ -4010,10 +3973,20 @@ output$Module_Select <- renderUI({
 
   output$correlations_plotOverview <- renderPlot({
     if(ncol(heatmap.data()$dat) > 1){
-      return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(), color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), main = paste(input$TypeVariable1, "across visits", sep = " "), breaks = 0))
+      if(input$colorRange){
+        return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, annheight = input$corrLegendSize, 
+                         color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+      }
+      return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), 
+                       annheight = input$corrLegendSize,border_color = "grey60", Rowv = row_clust.corr(), breaks = 0))
     }
     else{
-      return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),labRow = rows.plot(), color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), main = paste(input$TypeVariable1, "across visits", sep = " "), breaks = 0))
+      if(input$colorRange){
+        return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),labRow = rows.plot(), treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), border_color = "grey60", 
+                         annheight = input$corrLegendSize,Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+      }
+      return(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), border_color = "grey60", 
+                       annheight = input$corrLegendSize,Rowv = row_clust.corr(), breaks = c(-1,0,1)))
     }
   }, height = height1, width = width1)
 
@@ -4021,7 +3994,13 @@ output$Module_Select <- renderUI({
     filename = function() {paste(values$project_name,"_","Heatmap.png",sep = "")},
     content = function(file){
       png(file, width = (plotresolution.corr()/72)*width1(), height = (plotresolution.corr()/72)*height1(), res = plotresolution.corr())
-      print(aheatmap2(heatmap.data()$dat, annCol = heatmap.data()$col_anno, Colv = col_clust.corr(),labRow = rows.plot(), color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), main = paste(input$TypeVariable1, "across visits", sep = " "), breaks = 0))
+      if(input$colorRange){
+        print(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, annheight = input$corrLegendSize, 
+                         color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+      } else{
+        print(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), 
+                        annheight = input$corrLegendSize,border_color = "grey60", Rowv = row_clust.corr(), breaks = 0))
+      }
       dev.off()
     }
   )
@@ -4033,8 +4012,6 @@ output$Module_Select <- renderUI({
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract2),]
-
     visit.name = colnames(correlations)[3]
     visit <- unique(correlations[,3])
     visit <- gtools::mixedsort(as.character(visit))
@@ -4042,30 +4019,14 @@ output$Module_Select <- renderUI({
   })
 
   sub.dat <- reactive({
-    if(input$TypeVariable3 == input$TypeVariable1 & input$Base_subtract == input$Base_subtract2){
-      correlations <- h.dat()$correlations
-      if(input$var_switch2){
-        correlations <- correlations[,c(2,1,3:ncol(correlations))]
-        colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
-      }
-      correlations <- correlations[which(correlations$With == input$WithVariable3),]
-      correlations <- correlations[which(correlations[,3] == input$visit),]
-      z <- list(correlations = correlations)
+    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable3)]]
+    if(input$var_switch2){
+    correlations <- correlations[,c(2,1,3:ncol(correlations))]
+    colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    else{
-      correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable3)]]
-      correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract2),]
-      if(input$var_switch2){
-        correlations <- correlations[,c(2,1,3:ncol(correlations))]
-        colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
-      }
-      correlations <- correlations[which(correlations$With == input$WithVariable3),]
-      correlations <- correlations[which(correlations[,3] == input$visit),]
-
-      correlations$FDR <- p.adjust(correlations$Raw.P.Value, method = "fdr")
-      correlations$Bonf <- p.adjust(correlations$Raw.P.Value, method = "bonferroni")
-      z <- list(correlations = correlations)
-    }
+    correlations <- correlations[which(correlations$With == input$WithVariable3),]
+    correlations <- correlations[which(correlations[,3] == input$visit),]
+    z <- list(correlations = correlations)
     return(z)
   })
 
@@ -4098,6 +4059,12 @@ output$Module_Select <- renderUI({
 
     correlations <- correlations[,-c(which(colnames(correlations) == "Base_subtracted"), which(colnames(correlations) == "NObs"),
                                      which(colnames(correlations) == "Sign_NegLog10_p"))]
+    colnames(correlations)[1] <- values$y_var[which(values$correlation_names == input$TypeVariable3)]
+    colnames(correlations)[2] <- values$x_var[which(values$correlation_names == input$TypeVariable3)]
+    if(input$var_switch2){
+      colnames(correlations)[1] <- values$x_var[which(values$correlation_names == input$TypeVariable3)]
+      colnames(correlations)[2] <- values$y_var[which(values$correlation_names == input$TypeVariable3)]
+    }
     return(correlations)
   })
 
@@ -4107,20 +4074,22 @@ output$Module_Select <- renderUI({
       write.csv(subset_correlations(), file, row.names = FALSE)
     }
   )
+  
+  output$var_switch2 <- renderUI({
+    checkboxInput("var_switch2", strong(paste("Swap ",values$y_var[which(values$correlation_names == input$TypeVariable3)], " and ", values$x_var[which(values$correlation_names == input$TypeVariable3)], " columns", sep = "")),
+                                        value = FALSE)
+  })
 
   output$correlation_table <- renderDataTable({
     subset_correlations()
   })
 
   output$Visit2 <- renderUI({
-
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract3),]
-
     visit.name = colnames(correlations)[3]
     visit <- unique(correlations[,3])
     visit <- gtools::mixedsort(as.character(visit))
@@ -4128,44 +4097,26 @@ output$Module_Select <- renderUI({
   })
 
   output$subsetcorr2 <- renderUI({
-
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract3),]
     var <- as.character(sort(unique(correlations$With)))
     selectInput("subsetcorr3", paste("Subset by 'with' variable:",sep = ""), choices = var, selected = var[1:5], multiple = TRUE)
   })
 
   correlation.data <- reactive({
-
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
+    #correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
-    correlations <- correlations[which(correlations$Base_subtracted == input$Base_subtract3),]
     correlations <- correlations[which(correlations[,3] == input$visit2),]
 
     if(input$subsetModcorr2 == TRUE){
       correlations <- correlations[which(correlations$With %in% input$subsetcorr3),]
-    }
-
-    correlations$FDR <- 1
-    correlations$Bonf <- 1
-    if(input$var_switch3 == FALSE){
-      for(i in 1:length(unique(correlations$With))){
-        correlations$FDR[which(correlations$With == unique(correlations$With)[i])] <- p.adjust(correlations$Raw.P.Value[which(correlations$With == unique(correlations$With)[i])], "fdr")
-        correlations$Bonf[which(correlations$With == unique(correlations$With)[i])] <- p.adjust(correlations$Raw.P.Value[which(correlations$With == unique(correlations$With)[i])], "bonferroni")
-      }
-    }
-    else{
-      for(i in 1:length(unique(correlations$Variable))){
-        correlations$FDR[which(correlations$Variable == unique(correlations$Variable)[i])] <- p.adjust(correlations$Raw.P.Value[which(correlations$Variable == unique(correlations$Variable)[i])], "fdr")
-        correlations$Bonf[which(correlations$Variable == unique(correlations$Variable)[i])] <- p.adjust(correlations$Raw.P.Value[which(correlations$Variable == unique(correlations$Variable)[i])], "bonferroni")
-      }
     }
 
     if(input$var_switch3 == TRUE){
@@ -4311,31 +4262,70 @@ output$Module_Select <- renderUI({
     x <- correlation.data()$x
     GraphFrame <- correlation.data()$GraphFrame
     if(input$correction_method.corr3 == "Raw"){
-      GraphFrame <- GraphFrame[-which(GraphFrame$Raw.pVal >= input$Alpha2),]
+      GraphFrame <- GraphFrame[which(GraphFrame$Raw.pVal <= input$Alpha2),]
       p <- GraphFrame$Raw.pVal
     }
     if(input$correction_method.corr3 == "FDR"){
-      GraphFrame <- GraphFrame[-which(GraphFrame$FDR.pVal >= input$Alpha2),]
+      GraphFrame <- GraphFrame[which(GraphFrame$FDR.pVal <= input$Alpha2),]
       p <- GraphFrame$FDR.pVal
     }
     if(input$correction_method.corr3 == "Bonferroni"){
-      GraphFrame <- GraphFrame[-which(GraphFrame$Bonf.pVal >= input$Alpha2),]
+      GraphFrame <- GraphFrame[which(GraphFrame$Bonf.pVal <= input$Alpha2),]
       p <- GraphFrame$Bonf.pVal
     }
     p[p < .0001] <- .0001 #set log-10 transformed p-values <4 (=0.0001) to 4
+    p[p > .1] <- .1
     RV <- ifelse(GraphFrame$rVal>0,GraphFrame$rVal^4,(GraphFrame$rVal^4)*-1)
 
     if(length(p)/length(unique(GraphFrame$Correlation)) <= 260){
-      graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .06), breaks = c(round(min(p),4),round((min(p)+.05)/2,4),.05)) + geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + geom_point(alpha=I(.75))  + theme_minimal()  +
-        theme(panel.background=element_rect(fill="white"),
-              panel.grid = element_line(),panel.grid.major.y=element_blank(),
-              panel.grid.major.x = element_blank(),
-              axis.text.y=element_text(hjust=0),
-              axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
-        scale_x_discrete(expand=c(0,1)) +
-        scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),GraphFrame$rVal, low="navy", high="red", breaks=c(min(RV),0,max(RV)), labels = c(as.character(round(-1*(-1*min(RV))^(1/4),3)),"0",as.character(round(max(RV)^(1/4),3))))
+      if(input$Alpha2 > .05 & input$Alpha2 <= .075){
+        graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + 
+          scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .1), breaks = c(0.0001,0.025,0.05,0.075), labels = c(".0001", "0.025", "0.05", "0.075")) + 
+          geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + geom_point(alpha=I(.75))  + theme_minimal()  +
+          theme(panel.background=element_rect(fill="white"),
+                panel.grid = element_line(),panel.grid.major.y=element_blank(),
+                panel.grid.major.x = element_blank(),
+                axis.text.y=element_text(hjust=0),
+                axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
+          scale_x_discrete(expand=c(0,1))
+      }
+      if(input$Alpha2 > .075 & input$Alpha2 <= .1){
+        graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + 
+          scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .1), breaks = c(0.0001,0.025,0.05,0.075,0.1),
+                                labels = c(".0001", "0.025", "0.05", "0.075","0.1")) + geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + 
+          geom_point(alpha=I(.75))  + theme_minimal()  +
+          theme(panel.background=element_rect(fill="white"),
+                panel.grid = element_line(),panel.grid.major.y=element_blank(),
+                panel.grid.major.x = element_blank(),
+                axis.text.y=element_text(hjust=0),
+                axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
+          scale_x_discrete(expand=c(0,1))
+      }
+      if(input$Alpha2 > .1){
+        graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + 
+          scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .1), breaks = c(0.0001,0.025,0.05,0.075,0.1),
+                                labels = c(".0001", "0.025", "0.05", "0.075","> 0.1")) + geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + 
+          geom_point(alpha=I(.75))  + theme_minimal()  +
+          theme(panel.background=element_rect(fill="white"),
+                panel.grid = element_line(),panel.grid.major.y=element_blank(),
+                panel.grid.major.x = element_blank(),
+                axis.text.y=element_text(hjust=0),
+                axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
+          scale_x_discrete(expand=c(0,1))
+      }
+      if(input$Alpha2 <= .05){
+        graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + 
+          labs(y = y, x = x)  + scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .1), breaks = c(0.0001,0.025,0.05),
+                                                      labels = c(".0001","0.025", "0.05")) + geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + 
+          geom_point(alpha=I(.75))  + theme_minimal()  +
+          theme(panel.background=element_rect(fill="white"),
+                panel.grid = element_line(),panel.grid.major.y=element_blank(),
+                panel.grid.major.x = element_blank(),
+                axis.text.y=element_text(hjust=0),
+                axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
+          scale_x_discrete(expand=c(0,1))
+      }
     }
-
     if(length(p)/length(unique(GraphFrame$Correlation)) > 260){
       graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + scale_size_continuous("P-value",range=c(12,4),limits = c(min(p), .06), breaks = c(round(min(p),4),round((min(p)+.05)/2,4),.05)) + geom_point(colour="black",aes(size = p),shape=21,alpha=I(1)) + geom_point(alpha=I(.75))  + theme_minimal()  +
         theme(panel.background=element_rect(fill="white"),
@@ -4343,10 +4333,13 @@ output$Module_Select <- renderUI({
               panel.grid.major.x = element_blank(),
               axis.text.y=element_blank(),
               axis.text.x=element_text(angle=45,vjust=1,hjust=1)) +
-        scale_x_discrete(expand=c(0,1)) + scale_y_discrete(breaks = NULL) +
-        scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),GraphFrame$rVal, low="navy", high="red", breaks=c(min(RV),0,max(RV)), labels = c(as.character(round(-1*(-1*min(RV))^(1/4),3)),"0",as.character(round(max(RV)^(1/4),3))))
+        scale_x_discrete(expand=c(0,1)) + scale_y_discrete(breaks = NULL)
     }
-
+    if(input$bubbleColorRange){
+      graph <- graph + scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0, limits = c(-1,1))
+    } else{
+      graph <- graph + scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0) 
+    }
     return(graph)
   })
 
@@ -4364,7 +4357,6 @@ output$Module_Select <- renderUI({
   )
 
   output$Visit3 <- renderUI({
-
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     visit.name = colnames(correlations)[3]
     visit <- unique(correlations[,3])
@@ -4374,7 +4366,7 @@ output$Module_Select <- renderUI({
 
 
   scatter_plot <- reactive({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     correlation_file <- values$correlation_files[[which(values$correlation_names == input$TypeVariable7)]]
     x <- correlation_file[,input$WithVariable5][which(correlation_file[,colnames(correlations)[3]] == input$visit3)]
     y <- correlation_file[,input$corr_Variable2][which(correlation_file[,colnames(correlations)[3]] == input$visit3)]
@@ -4404,13 +4396,15 @@ output$Module_Select <- renderUI({
   })
 
   scatter_makePlot <- reactive({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     if(input$log_scale == TRUE){
-      dat <- data.frame(x = scatter_plot()$x, y = log2(scatter_plot()$y + 1))
+      dat <- data.frame(x = log2(scatter_plot()$x + 1), y = log2(scatter_plot()$y + 1))
     }
     else{
       dat <- data.frame(x = scatter_plot()$x, y = scatter_plot()$y)
     }
+    pearson.r <- cor.test(dat$x, dat$y)$estimate
+    p.val <- cor.test(dat$x, dat$y)$p.value
     scat.plot <-  ggplot(data = dat, aes(x = x, y = y)) + geom_point(size = input$Point_size) + theme_bw()+
       labs(x = paste(input$WithVariable5, colnames(correlations)[3], input$visit3, sep = " "), y = paste(input$corr_Variable2, colnames(correlations)[3], input$visit3, sep = " ")) +
       theme(axis.text = element_text(size = axis_text_size()), axis.title = element_text(size = axis_label_size()))
@@ -4426,6 +4420,9 @@ output$Module_Select <- renderUI({
         scat.plot <- scat.plot + geom_smooth(method = "loess", se = FALSE, span = input$span)
       }
     }
+    grob <- grid::grobTree(textGrob(paste("Pearson r = ", round(pearson.r, 4),"\n P-Value = ", round(p.val, 4), sep = ""), x = .99, y=.965, just=1,
+                              gp=gpar(col="blue", fontsize=14)))
+    scat.plot <- scat.plot + annotation_custom(grob)
     z <- list(scatplot = scat.plot, dat = dat)
     return(z)
   })

@@ -626,7 +626,14 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
       count_matrix[[i]]$Module <- NULL
     }
     count_matrix <- do.call(cbind, count_matrix)
-    prop_matrix <- count_matrix/data.frame(table(geneList()$Module))$Freq
+    freq <- data.frame(table(geneList()$Module))$Freq
+    names(freq) <- data.frame(table(geneList()$Module))$Var1
+    freq.matched <- freq[match(rownames(count_matrix), names(freq), nomatch = 0)]
+    prop_matrix <- count_matrix/freq.matched
+    missingMods <- names(freq)[which(!names(freq) %in% names(freq.matched))]
+    missingData <- data.frame(matrix(0,nrow = length(missingMods), ncol = ncol(prop_matrix)))
+    rownames(missingData) <- missingMods
+    colnames(missingData) <- colnames(prop_matrix)
     colnames(prop_matrix) <- p.names
     prop_matrix2 <- prop_matrix
     prop_matrix2[prop_matrix < .1 & prop_matrix > -.1] <- 0

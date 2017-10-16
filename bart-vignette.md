@@ -1,4 +1,4 @@
-<h1 style = "text-align: center; color: blue"><b>BART: Biostatistical Analysis Reporting Tool</b></h1>
+<h1 style = "text-align: center; color: #456dae"><b>BART: Biostatistical Analysis Reporting Tool</b></h1>
 
 ## <b>Introduction</b>
 <p style = "font-size: 115%; text-align: justify">BART is a user friendly, point and click, R shiny application that was developed as a reporting tool for a broad range of high throughput studies such as RNA sequencing, Microarray, and Flow Cytometry. BART provides users with the ability to interactively view the entire analysis workflow:</p>

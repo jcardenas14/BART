@@ -40,7 +40,7 @@ helpPopup <- function(title, content,
       )
     ),
     tags$a(
-      href = "#", class = "btn btn-mini", `data-toggle` = "popover",
+      href = "#", class = "btn btn-mini", `data-toggle` = "popover",`data-html`="true",
       title = title, `data-content` = content, `data-animation` = TRUE,
       `data-placement` = match.arg(placement, several.ok=TRUE)[1],
       `data-trigger` = match.arg(trigger, several.ok=TRUE)[1],
@@ -60,7 +60,7 @@ infoPopup <- function(title, content,
       )
     ),
     tags$a(
-      href = "#", class = "btn btn-mini", `data-toggle` = "popover",
+      href = "#", class = "btn btn-mini", `data-toggle` = "popover",`data-html`="true",
       title = title, `data-content` = content, `data-animation` = TRUE,
       `data-placement` = match.arg(placement, several.ok=TRUE)[1],
       `data-trigger` = match.arg(trigger, several.ok=TRUE)[1],
@@ -256,10 +256,11 @@ dataManipulate <- function(y, x, colname, ref_var, ref_level, long = FALSE,
                                  ref_level = ref_level, keep = keep)
       }
       lev_norm <- do.call("cbind", lev_norm)
-      design_norm <- x[(x[, index_subid] %in% complete_ids), ]
-      if (keep == FALSE) {
-        design_norm <- design_norm[(design_norm[, index_refvar] != ref_level), ]
-      }
+      #design_norm <- x[(x[, index_subid] %in% complete_ids), ]
+      design_norm <- x[match(colnames(lev_norm), x$columnname, nomatch = 0),]
+      #if (keep == FALSE) {
+        #design_norm <- design_norm[(design_norm[, index_refvar] != ref_level), ]
+      #}
     }
     if (long == FALSE) {
       index_refvar <- which(names(x) == ref_var)
@@ -268,12 +269,13 @@ dataManipulate <- function(y, x, colname, ref_var, ref_level, long = FALSE,
       lev_names <- lev[, colname]
       lev_rm_names <- lev_rm[, colname]
       lev_norm <- getNorm2(y = y, lev_names, lev_rm_names, keep = keep)
-      if (keep == FALSE) {
-        design_norm <- lev_rm
-      }
-      if (keep == TRUE) {
-        design_norm <- x
-      }
+      design_norm <- x[match(colnames(lev_norm), x$columnname, nomatch = 0),]
+      #if (keep == FALSE) {
+        #design_norm <- lev_rm
+      #}
+      #if (keep == TRUE) {
+        #design_norm <- x
+      #}
     }
   } else {
     means_y <- as.vector(apply(y[, -(1:2)], 1, mean))
@@ -462,7 +464,7 @@ filterOptsUI <- function(id){
   condCall2 <- paste0("input['",ns("showfc"),"'] == true")
   
   tagList(
-    div(style = "display:inline-block", checkboxInput(ns("TSoptions"), strong("Testing and fold change subsetting options", style = "color:blue"), FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns("TSoptions"), strong("Testing and fold change subsetting options", style = "color:#456dae"), FALSE)),
     div(style = "display:inline-block", helpPopup("Testing and fold change subsetting options", "These options allow the user to filter on signifance threshold and fold change.")),
     conditionalPanel(condition = condCall1,
                      selectInput(ns("correction_method"),"Multiple testing correction:",
@@ -654,7 +656,7 @@ subsetAndOrderUI <- function(id){
   condCall2 <- paste0("input['",ns("orderCols"),"'] == true")
   
   tagList(
-    div(style = "display:inline-block", checkboxInput(ns("subsetCols"),strong("Subset column options", style = "color:blue"),FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns("subsetCols"),strong("Subset column options", style = "color:#456dae"),FALSE)),
     div(style = "display:inline-block", helpPopup("Subset column options", "These options allow the user to plot a subset of the samples within the expression data set.")),
     conditionalPanel(condition = condCall1,
                      uiOutput(ns('subsetVar1')),
@@ -663,7 +665,7 @@ subsetAndOrderUI <- function(id){
                      uiOutput(ns('subsetVal2'))
     ),
     br(),
-    div(style = "display:inline-block", checkboxInput(ns('orderCols'), strong("Ordering column options", style = "color:blue"), FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns('orderCols'), strong("Ordering column options", style = "color:#456dae"), FALSE)),
     div(style = "display:inline-block", helpPopup("Ordering column options", "These options allow the user to specify column ordering by column variable.")),
     conditionalPanel(condition = condCall2,
                      uiOutput(ns('orderingVars'))
@@ -671,12 +673,12 @@ subsetAndOrderUI <- function(id){
   )
 }
 
-subsetAndOrderRenderUI <- function(input, output, session, des, groupingVar){
+subsetAndOrderRenderUI <- function(input, output, session, des){
   return(
     tagList(
       output$subsetVar1 <- renderUI({
         ns <- session$ns
-        selectizeInput(ns("subsetVar1"),"Variable 1 to subset heatmap:",c(colnames(des())), selected = colnames(des())[1],multiple = FALSE)
+        selectizeInput(ns("subsetVar1"),"Variable 1 to subset heatmap:",c(colnames(des())), selected = NULL,multiple = TRUE,options = list(maxItems = 1))
       }),
       output$subsetVal1 <- renderUI({
         ns <- session$ns
@@ -684,7 +686,7 @@ subsetAndOrderRenderUI <- function(input, output, session, des, groupingVar){
       }),
       output$subsetVar2 <- renderUI({
         ns <- session$ns
-        selectizeInput(ns("subsetVar2"),"Variable 2 to subset heatmap:",c(colnames(des())),selected = colnames(des())[1], multiple = FALSE)
+        selectizeInput(ns("subsetVar2"),"Variable 2 to subset heatmap:",c(colnames(des())),selected = NULL, multiple = TRUE,options = list(maxItems = 1))
       }),
       output$subsetVal2 <- renderUI({
         ns <- session$ns
@@ -693,37 +695,46 @@ subsetAndOrderRenderUI <- function(input, output, session, des, groupingVar){
       output$orderingVars <- renderUI({
         ns <- session$ns
         selected <- colnames(des())[1]
-        if(!is.null(groupingVar())){
-          selected <- colnames(des())[which(colnames(des()) %in% groupingVar())]
-        }
         selectizeInput(ns("orderingVars"), "Select variables to order heatmap:", choices = colnames(des()), selected = selected, multiple = TRUE)
       })
     )
   )
 }
 
-subsetAndOrder <- function(input, output, session, des, data, sampleAnnot, groupingVar){
+subsetAndOrder <- function(input, output, session, des, data, sampleAnnot){
   x <- data()
   if(!is.null(sampleAnnot())){
     colnames(x) <- as.character(des()[,sampleAnnot()])
   }
   if(input$subsetCols){
-    x.sub <- x[,which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2)]
-    design <- des()[which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2),]
-    design[,input$subsetVar1] <- as.character(design[,input$subsetVar1])
-    design[,input$subsetVar2] <- as.character(design[,input$subsetVar2])
+    if(!is.null(input$subsetVar1) & !is.null(input$subsetVar2)){
+      x.sub <- x[,which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2)]
+      design <- des()[which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2),]
+      design[,input$subsetVar1] <- factor(as.character(design[,input$subsetVar1]), levels = input$subsetVal1)
+      design[,input$subsetVar2] <- factor(as.character(design[,input$subsetVar2]), levels = input$subsetVal2)
+    } else if(!is.null(input$subsetVar1) & is.null(input$subsetVar2)){
+      x.sub <- x[,which(des()[,input$subsetVar1] %in% input$subsetVal1)]
+      design <- des()[which(des()[,input$subsetVar1] %in% input$subsetVal1),]
+      design[,input$subsetVar1] <- factor(as.character(design[,input$subsetVar1]), levels = input$subsetVal1)
+    } else if(is.null(input$subsetVar1) & is.null(input$subsetVar2)){
+      x.sub <- x
+      design <- des()
+    }
     if(input$orderCols){
       order.vars <- do.call(order, design[,input$orderingVars, drop = FALSE])
       x.ord <- x.sub[,order.vars]
       colAnnot <- design[order.vars,input$orderingVars,drop = FALSE]
       design <- design[order.vars,]
     } else {
-      x.ord <- x.sub
       orderingVars <- c(input$subsetVar1, input$subsetVar2)
-      if(!is.null(groupingVar())){
-        orderingVars <- groupingVar()
+      order.vars <- do.call(order, design[,orderingVars, drop = FALSE])
+      x.ord <- x.sub[,order.vars]
+      colAnnot <- design[order.vars,orderingVars, drop = FALSE]
+      if(is.null(input$subsetVar1) & is.null(input$subsetVar2)){
+        orderingVars <- colnames(des())[1]
+        x.ord <- x.sub[,order(design[,orderingVars])]
+        colAnnot <- design[order(design[,orderingVars]),orderingVars,drop = FALSE]
       }
-      colAnnot <- design[,orderingVars, drop = FALSE]
     }
   } else {
     if(input$orderCols){
@@ -732,12 +743,9 @@ subsetAndOrder <- function(input, output, session, des, data, sampleAnnot, group
       colAnnot <- des()[order.vars,input$orderingVars,drop=FALSE]
       design <- des()[order.vars,]
     } else {
-      x.ord <- x
-      orderingVars <- c(input$subsetVar1, input$subsetVar2)
-      if(!is.null(groupingVar())){
-        orderingVars <- groupingVar()
-      }
-      colAnnot <- des()[,orderingVars,drop = FALSE]
+      orderingVars <- colnames(des())[1]
+      x.ord <- x[,order(des()[,orderingVars])]
+      colAnnot <- des()[order(des()[,orderingVars]),orderingVars,drop = FALSE]
       design <- des()
     }
   }
@@ -764,15 +772,15 @@ colClusterUI <- function(id){
   condCall2 <- paste0("input['",ns("clusterGroups"),"'] == true")
   
   tagList(
-    div(style = "display:inline-block", checkboxInput(ns('clusterOptions'), strong("Clustering column options", style = "color:blue"), FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns('clusterOptions'), strong("Clustering column options", style = "color:#456dae"), FALSE)),
     div(style = "display:inline-block", helpPopup("Cluster column options", "These options allow the user to cluster the samples and label the groups they are clustered in.")),
     conditionalPanel(condition = condCall1,
                      checkboxInput(ns("colCluster"),"Cluster samples (columns)",FALSE),
                      checkboxInput(ns('clusterGroups'), "Show cluster groups", FALSE),
                      conditionalPanel(condition = condCall2,
-                                      div(style = "display:inline-block", uiOutput(ns('clusterCuts'))),
+                                      div(style = "display:inline-block", uiOutput(ns('clusterCuts')))),
                                       div(style = "display:inline-block", infoPopup("Cluster Cuts", "Optimal number calculated using Dunn's Index.",
-                                                                                    placement = "right", trigger = "click"))))
+                                                                                    placement = "right", trigger = "click")))
   )
 }
 
@@ -834,15 +842,12 @@ clusterAssociationUI <- function(id){
   )
 }
 
-clusterAssociationRenderUI <- function(input, output, session, data, groupingVar){
+clusterAssociationRenderUI <- function(input, output, session, data){
   tagList(
     output$selectGroup <- renderUI({
       ns <- session$ns
       selected <- data()[,1]
-      if(!is.null(groupingVar())){
-        selected = groupingVar()
-      }
-      selectizeInput(ns("selectGroup"), "Choose a Group for Association Test", choices = colnames(data()), selected = selected)
+      selectizeInput(ns("selectGroup"), "Choose a Group for Association Test", choices = colnames(data()), selected = NULL, multiple = TRUE, options = list(maxItems = 1))
     }),
     output$clusterNumber <- renderUI({
       ns <- session$ns
@@ -852,6 +857,7 @@ clusterAssociationRenderUI <- function(input, output, session, data, groupingVar
 }
 
 clusterAssociation <- function(input, output, session, des, hclObj){
+  if(is.null(input$selectGroup)){return(NULL)}
   clusters <- cutree(hclObj(), input$clusterNumber)
   tab <- aggregate(des()[[input$selectGroup]] ~ clusters, data = des(), FUN = table)
   tab <- as.data.frame(tab[,2])
@@ -896,7 +902,7 @@ uploadVarsUI <- function(id, varType){
                                depending on whether the list provided is the PROBE ID's or gene symbols.") 
   
   tagList(
-    div(style = "display:inline-block", checkboxInput(ns("uploadVars"), strong(uploadType, style = "color:blue"), FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns("uploadVars"), strong(uploadType, style = "color:#456dae"), FALSE)),
     div(style = "display:inline-block", infoPopup(uploadType, uploadDescription, placement = "right", trigger = "click")),
     conditionalPanel(condition = condCall1,
                      fileInput(ns('varSelect'), '', multiple = FALSE, accept=c(".csv")),
@@ -938,7 +944,7 @@ graphOptionsUI <- function(id, varType = "transcripts"){
   
   if(varType == "modules"){
     return(tagList(
-      div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:blue"), FALSE)),
+      div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:#456dae"), FALSE)),
       div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).")),
       conditionalPanel(condition = condCall1,
                        sliderInput(ns('graphWidth'), "Plot width", min = 400, max = 2000, value = 750, step = 25),
@@ -951,7 +957,7 @@ graphOptionsUI <- function(id, varType = "transcripts"){
     ))
   }
   return(tagList(
-    div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:blue"), FALSE)),
+    div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:#456dae"), FALSE)),
     div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).")),
     conditionalPanel(condition = condCall1,
                      sliderInput(ns('graphWidth'), "Plot width", min = 400, max = 2000, value = 750, step = 25),

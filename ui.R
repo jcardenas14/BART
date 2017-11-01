@@ -12,7 +12,7 @@ header <- dashboardHeader(title = "Biostatistical Analysis Reporting Tool (BART)
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
-    menuItem("About BART", icon = icon("info-circle"), tabName = "intro"),
+    #menuItem("About BART", icon = icon("info-circle"), tabName = "intro"),
     menuItem("Upload", icon = icon("cloud-upload"), tabName = "upload"),
     menuItemOutput("SumStat"),
     menuItemOutput("Unsupervised"),
@@ -56,9 +56,8 @@ body <-  dashboardBody(
               #correlations_scatter_plot.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}")),
   shinyjs::useShinyjs(),
   tabItems(
-    uiOutput("css_colors"),
-    tabItem(tabName = "intro",
-            htmltools::includeMarkdown("bart-vignette.md")),
+    #tabItem(tabName = "intro",
+            #htmltools::includeMarkdown("bart-vignette.md")),
     tabItem(tabName = "upload", 
             fluidRow(
               box(title = "Upload Results", width = 4, status = "primary", solidHeader = FALSE,
@@ -114,21 +113,21 @@ body <-  dashboardBody(
                   br(),
                   div(style = "display:inline-block", uiOutput("summary0Text")),
                   div(style = "display:inline-block", helpPopup("Summary Table 1", "Given the summary variable selected by the user, statistics will be provided for 
-                                                                     each category of the users BY variable selection.  In longitudinal settings, this table will display 
-                                                                     a warning if the summary variable is changing over time.  Refer to Table 2.", placement = "right",
+                                                                each category of the users BY variable selection.  In longitudinal settings, this table will display 
+                                                                a warning if the summary variable is changing over time.  Refer to Table 2.", placement = "right",
                                                                 trigger = "click")),
                   tableOutput('summary0')
               )
-            ),
+                  ),
             fluidRow(
               box(title = "Table 2", width = 6, status = "primary", solidHeader = FALSE,
-                downloadButton('downloadSummary1', 'Download Table'),
-                br(),
-                div(style = "display:inline-block", uiOutput("summary1Text")),
-                div(style = "display:inline-block", helpPopup("Summary Table 2", "Given the summary variable selected by the user, statistics will be provided for 
-                                                              each category of the users BY variable selection and for each time point in longitudinal settings.", placement = "right",
-                                                              trigger = "click")),
-                tableOutput('summary1')
+                  downloadButton('downloadSummary1', 'Download Table'),
+                  br(),
+                  div(style = "display:inline-block", uiOutput("summary1Text")),
+                  div(style = "display:inline-block", helpPopup("Summary Table 2", "Given the summary variable selected by the user, statistics will be provided for 
+                                                                each category of the users BY variable selection and for each time point in longitudinal settings.", placement = "right",
+                                                                trigger = "click")),
+                  tableOutput('summary1')
               ),
               box(title = "Table 3", width = 6, status = "primary", solidHeader = FALSE,
                   downloadButton('downloadSummary2', 'Download Table'),
@@ -139,8 +138,8 @@ body <-  dashboardBody(
                                                                 trigger = "click")),
                   tableOutput('summary2')
               )
-            )
-    ),
+                  )
+              ),
     
     tabItem(tabName = "pvca",
             helpText("Data Filtering and Batch Assesment Summary:"),
@@ -171,7 +170,7 @@ body <-  dashboardBody(
                 uiOutput("dropdowncolumns"),
                 uiOutput("coordflip"),
                 br(),
-                div(style = "display:inline-block", checkboxInput("graphicsqc", strong("Graphing options", style = "color:blue"), TRUE)),
+                div(style = "display:inline-block", checkboxInput("graphicsqc", strong("Graphing options", style = "color:#456dae"), TRUE)),
                 div(style = "display:inline-block", helpPopup("Graphing options", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                 conditionalPanel(condition = "input.graphicsqc",
                                  sliderInput('qcplotsizew', "Grid width", min = 500, max = 2000, value = 800, step = 25),
@@ -209,10 +208,10 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Heatmap", width = 8, status = "primary", solidHeader = FALSE, 
                                     div(style = "display:inline-block", strong("Help Message")),
-                                    div(style = "display:inline-block", infoPopup("Probe Level Heat Maps", 'The heat map below is constructed on individual samples for a number of scenarios, 
-                                                                                  specifically for baseline samples only (cross sectional) or all samples at all time points.  For baseline samples, 
-                                                                                  heatmaps can be generated based on normalizing the expression data to the median, or to a control group if applicable.  
-                                                                                  When all samples at all time points are to be plotted, heatmaps can be generated by normalizing to the median, 
+                                    div(style = "display:inline-block", infoPopup("Gene Level Heat Maps", 'The heat map below is constructed on individual samples for a number of scenarios, 
+                                                                                  specifically for baseline samples only (cross sectional) or all samples at all time points. For baseline samples, 
+                                                                                  heatmaps can be generated based on normalizing the expression data to the mean, or to a control group if applicable.  
+                                                                                  When all samples at all time points are to be plotted, heatmaps can be generated by normalizing to the mean, 
                                                                                   a control group, or each subjects own baseline value. Only samples that have a corresponding baseline sample are 
                                                                                   included in the map. The initial graph of the heat map may not be very appealing depending on the number of samples. 
                                                                                   The inputs on the left have a wide variety of user options that range from the type of normalized data, clustering rows 
@@ -224,19 +223,33 @@ body <-  dashboardBody(
                                                                                   placement = "bottom", trigger = "click")),
                                     helpText(""),
                                     textOutput('OptimalNumber'),
-                                    downloadButton('downloadHeatmap', 'Download Data'),
-                                    downloadButton("downloadModPlot4", "Download Figure"),
+                                    downloadButton('downloadHeatmapData', 'Download Data'),
+                                    downloadButton("downloadHeatmap", "Download Figure"),
                                     helpText(""),
-                                    div(style = "display:inline-block", checkboxInput("modulemeans", strong("Download module scores:", style = "color:blue"), FALSE)),
-                                    div(style = "display:inline-block", infoPopup("Download module scores", "The downloaded data is calculated by averaging all the probes within each module.",
-                                                                                  placement = "right", trigger = "click")),
+                                    #div(style = "display:inline-block", checkboxInput("modulemeans", strong("Download module scores:", style = "color:#456dae"), FALSE)),
+                                    #div(style = "display:inline-block", infoPopup("Download module scores", "The downloaded data is calculated by averaging all the probes within each module.",
+                                                                                  #placement = "right", trigger = "click")),
                                     plotOutput('heatmap')
                                 )
                               )
                      ),
                      tabPanel("Cluster Number Diagnostics",
-                              downloadButton('downloadClusterPlot3', 'Download Figure'),
-                              plotOutput('clusterPlot')
+                              div(class = "container-fluid",
+                                  div(class = "row",
+                                      div(class = "col-md-4",
+                                        h4(strong("Dunn Index")),
+                                        p("The Dunn Index is a metric used to assess the quality of a given set of clusters. When the number of clusters (n) is not known beforehand (such is the case with hierarchical clustering),
+                                           the Dunn Index is computed for n = 2 to n = half the sample size. The optimal number of clusters is chosen by the highest Dunn Index. While in some sense, metrics such as the Dunn Index
+                                           provide an objective means by which to select the optimal number of clusters, choosing cluster groupings should always entail looking at the heat maps and dendrograms to see if the number
+                                           suggested by the Dunn Index makes sense for the specific data at hand."),
+                                        p(strong("The bar plot on the right is based on the samples clustered in the previous tab."))
+                                      ),
+                                      div(class = "col-md-8",
+                                          downloadButton('downloadClusterPlot3', 'Download Figure'),
+                                          plotOutput('clusterPlot')
+                                      )
+                                  )
+                              )
                      ),
                      tabPanel("Cluster Association Analysis",
                               fluidRow(
@@ -336,8 +349,12 @@ body <-  dashboardBody(
     tabItem(tabName = "overview",
             fluidRow(
               box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
-                  numericInput('alphalevel2',"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),                                                            
-                  selectInput("sigsign", "Fold change sign:", c("All (include 0)", "+", "-"), selected = "all (include 0)"),
+                  numericInput('alphalevel2',"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),  
+                  checkboxInput("overviewFc",label = strong("Filter on fold change:"),value = FALSE),
+                  conditionalPanel(condition = "input.overviewFc",
+                                   numericInput("selectFcValue", label = "Fold change threshold:",min = 0, value = 0, step = 0.1),
+                                   selectInput("selectFcSign","Fold change sign:", c("+", "-", "Both"), c("Both"))),
+                  #selectInput("sigsign", "Fold change sign:", c("All (include 0)", "+", "-"), selected = "all (include 0)"),
                   tags$hr() # add a horizontal line
               ),
               box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
@@ -392,9 +409,10 @@ body <-  dashboardBody(
                                     trigger = "click")),
                                     uiOutput("PaloOrFirst1"),
                                     checkboxInput("only_annotated", strong("Plot only annotated modules"), FALSE),
+                                    checkboxInput("showAnnotated", strong("Show annotations on plot"), FALSE),
                                     filterOptsUI("qusFcPlot"),
                                     br(),
-                                    div(style = "display:inline-block", checkboxInput("graphics6", strong("Graphing options", style = "color:blue"), FALSE)),
+                                    div(style = "display:inline-block", checkboxInput("graphics6", strong("Graphing options", style = "color:#456dae"), FALSE)),
                                     div(style = "display:inline-block", helpPopup("Graphing options", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                                     conditionalPanel(condition = "input.graphics6",
                                                      div(style = "display:inline-block",uiOutput("ColorChoice")), 
@@ -429,7 +447,7 @@ body <-  dashboardBody(
                                     br(),
                                     filterOptsUI("qusIndFcPlot"),
                                     br(),
-                                    div(style = "display:inline-block", checkboxInput("graphics7", strong("Graphing options", style = "color:blue"), FALSE)),
+                                    div(style = "display:inline-block", checkboxInput("graphics7", strong("Graphing options", style = "color:#456dae"), FALSE)),
                                     div(style = "display:inline-block", helpPopup("Graphing options", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                                     conditionalPanel(condition = "input.graphics7",
                                                      sliderInput("PlotWidth2", "Plot Width", min = 500, max = 5000, value = 800, step = 100),
@@ -534,7 +552,7 @@ body <-  dashboardBody(
                   uiOutput("pcaAnnotValsM"),
                   uiOutput("pcaBlockingM"),
                   selectInput("PCSnumM", "Select number of PCs to plot:", choices = c(2,3), selected = 2),
-                  div(style = "display:inline-block", checkboxInput("graphicsPCAM", strong("Graphing options", style = "color:blue"), FALSE)),
+                  div(style = "display:inline-block", checkboxInput("graphicsPCAM", strong("Graphing options", style = "color:#456dae"), FALSE)),
                   div(style = "display:inline-block", helpPopup("Graphing options", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                   conditionalPanel(condition = "input.graphicsPCAM",
                                    sliderInput("PlotWidthPCAM", "Plot Width", min = 500, max = 2000, value = 800, step = 50),
@@ -667,7 +685,7 @@ body <-  dashboardBody(
                                     div(style = "display:inline-block", helpPopup("Upload Variable List", "Allows the user to provide their own list of variables to plot. The user should create a CSV file that contains 
                                                                                   a single column of variable names to upload. The column should be given a name of the user's choosing.")),
                                     uiOutput("fileupload1"),
-                                    div(style = "display:inline-block", checkboxInput("TSoptions2", strong("P-Value and Correlation Value Subsetting Options:", style = "color:blue"), FALSE)),
+                                    div(style = "display:inline-block", checkboxInput("TSoptions2", strong("P-Value and Correlation Value Subsetting Options:", style = "color:#456dae"), FALSE)),
                                     conditionalPanel(condition = "input.TSoptions2",
                                                      selectInput("correction_method.corr","Multiple testing correction:",c("FDR","Bonferroni","Raw"),"Raw"),
                                                      numericInput("Alpha1", "Significance threshold:", min = 0, max = 1, step = .01, value = 1),
@@ -677,7 +695,7 @@ body <-  dashboardBody(
                                                                                    min = 0, max = 1, value = 0, step = 0.1),
                                                                       selectInput("corrsign1","Correlation value sign:", c("+", "-", "Both"), c("Both")))
                                     ),
-                                    checkboxInput("subsetModcorr",strong("Subset or Order Columns:", style = "color:blue"),FALSE),
+                                    checkboxInput("subsetModcorr",strong("Subset or Order Columns:", style = "color:#456dae"),FALSE),
                                     conditionalPanel(condition="input.subsetModcorr",
                                                      uiOutput("subsetcorr")),
                                     div(style = "display:inline-block", checkboxInput("rowclustcorr", strong("Row cluster"),FALSE)),
@@ -685,7 +703,7 @@ body <-  dashboardBody(
                                                                                  placement = "right", trigger = "click")),
                                     checkboxInput("colclustcorr", strong("Column cluster"), FALSE),
                                     checkboxInput("colorRange", strong("Force Color Range From -1 to 1"), FALSE),
-                                    div(style = "display:inline-block", checkboxInput("graphics9", strong("Graphing options", style = "color:blue"), TRUE)),
+                                    div(style = "display:inline-block", checkboxInput("graphics9", strong("Graphing options", style = "color:#456dae"), TRUE)),
                                     div(style = "display:inline-block", helpPopup("Graphing options:", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                                     conditionalPanel(condition = "input.graphics9",
                                                      sliderInput("PlotWidth4", "Plot Width", min = 500, max = 5000, value = 800, step = 100),
@@ -712,7 +730,7 @@ body <-  dashboardBody(
                                                                                   a single column of variable names to upload. The column should be given a name of the user's choosing.")),
                                     uiOutput("fileupload2"),
                                     uiOutput("Visit2"),
-                                    div(style = "display:inline-block", checkboxInput("TSoptions4", strong("P-Value and Correlation Value Subsetting Options:", style = "color:blue"), FALSE)),
+                                    div(style = "display:inline-block", checkboxInput("TSoptions4", strong("P-Value and Correlation Value Subsetting Options:", style = "color:#456dae"), FALSE)),
                                     conditionalPanel(condition = "input.TSoptions4",
                                                      selectInput("correction_method.corr3","Multiple testing correction:",c("FDR","Bonferroni","Raw"),"Raw"),
                                                      numericInput("Alpha2", "Significance threshold:", min = 0, max = 1, step = .01, value = .05),
@@ -722,11 +740,11 @@ body <-  dashboardBody(
                                                                                    min = 0, max = 1, value = 0, step = 0.1),
                                                                       selectInput("corrsign2","Correlation value sign:", c("+", "-", "Both"), c("Both")))
                                     ),
-                                    checkboxInput("subsetModcorr2",strong("Subset Column Options:", style = "color:blue"),FALSE),
+                                    checkboxInput("subsetModcorr2",strong("Subset Column Options:", style = "color:#456dae"),FALSE),
                                     conditionalPanel(condition="input.subsetModcorr2",
                                                      uiOutput("subsetcorr2")),
                                     checkboxInput("bubbleColorRange", strong("Force Color Range from -1 to 1"), FALSE),
-                                    div(style = "display:inline-block", checkboxInput("graphics8", strong("Graphing options", style = "color:blue"), TRUE)),
+                                    div(style = "display:inline-block", checkboxInput("graphics8", strong("Graphing options", style = "color:#456dae"), TRUE)),
                                     div(style = "display:inline-block", helpPopup("Graphing options:", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                                     conditionalPanel(condition = "input.graphics8",
                                                      sliderInput("PlotWidth3", "Plot Width", min = 500, max = 5000, value = 800, step = 100),
@@ -746,7 +764,7 @@ body <-  dashboardBody(
                                     uiOutput("TypeVariable2"),
                                     uiOutput("var_switch2"),
                                     uiOutput("WithVariable2"),
-                                    div(style = "display:inline-block", checkboxInput("TSoptions3", strong("P-Value and Correlation Value Subsetting Options:", style = "color:blue"), FALSE)),
+                                    div(style = "display:inline-block", checkboxInput("TSoptions3", strong("P-Value and Correlation Value Subsetting Options:", style = "color:#456dae"), FALSE)),
                                     conditionalPanel(condition = "input.TSoptions3",
                                                      selectInput("correction_method.corr2","Multiple testing correction:",c("FDR","Bonferroni","Raw"),"Raw"),
                                                      numericInput("Alpha", "Significance threshold:", min = 0, max = 1, step = .01, value = .05),
@@ -776,7 +794,7 @@ body <-  dashboardBody(
                                     checkboxInput("plot_loess", "Fit loess curve", value = FALSE),
                                     conditionalPanel(condition = "input.plot_loess",
                                                      numericInput("span", "Span (0 to 1):", min = 0, max = 1, value = 1, step = .05)),
-                                    div(style = "display:inline-block", checkboxInput("graphics10", strong("Graphing options", style = "color:blue"), TRUE)),
+                                    div(style = "display:inline-block", checkboxInput("graphics10", strong("Graphing options", style = "color:#456dae"), TRUE)),
                                     div(style = "display:inline-block", helpPopup("Graphing options:", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
                                     conditionalPanel(condition = "input.graphics10",
                                                      numericInput("Point_size", "Circle size (1 to 5):",min=1,max=5,value=2,step=.5),

@@ -21,9 +21,9 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
   box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
       uiOutput("Comparison1"),
       filterOptsUI("dgeResultsTable"),
-      #checkboxInput("merge", "Merge module information", FALSE),
-      numericInput('modmaplmmres', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1),
-      checkboxInput("DownloadOptions", strong("Download multiple genelists at once:", style = "color:blue"), FALSE),
+      uiOutput("merge"),
+      uiOutput("modmaplmmres"),
+      checkboxInput("DownloadOptions", strong("Download multiple genelists at once:", style = "color:#456dae"), FALSE),
       conditionalPanel(condition = "input.DownloadOptions",
                        uiOutput("selectComps"),
                        textInput("ziptext", label = "Filename Input", value = "All_Comparisons_Raw.05"),
@@ -38,10 +38,17 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       dataTableOutput("genelisttable")
   )
 )), list(Title = "Diagnostics", Content = fluidRow(
-  box(title = "P-Value Distribution Assesment", width = 12, status = "primary", solidHeader = FALSE,
+  column(width = 4,
+         box(title = "Comparison Selection", width = NULL, status = "primary",
+             uiOutput("diagnosticsComparison")
+         ),
+         box(title = "Overview Table", width = NULL, status = "primary",
+             dataTableOutput("numtable")
+         )
+  ),
+  box(title = "P-Value Distribution Assesment", width = 8, status = "primary", solidHeader = FALSE,
       plotOutput("distplot"), plotOutput("genelistgraph"), 
-      textOutput("intro"),
-      dataTableOutput("numtable")
+      textOutput("intro")
   )
 )), list(Title = "Significant Variables Heatmap", Content = fluidRow(
   box(title = "Heatmap Options", width = 4, status = "primary", solidHeader = FALSE,
@@ -105,13 +112,13 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
     box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
         actionButton("goModDge", "Plot"),
         br(),
-        div(style = "display:inline-block", checkboxInput(inputId = "compSelect", label = strong("Comparison(s) selection:", style = "color:blue"), value = FALSE)),
+        div(style = "display:inline-block", checkboxInput(inputId = "compSelect", label = strong("Comparison(s) selection:", style = "color:#456dae"), value = FALSE)),
         div(style = "display:inline-block", helpPopup("Comparison(s) selection", "This option allows the user to select specific comparisons of interest")),
         conditionalPanel(condition = "input.compSelect == true",
                          uiOutput("Comparison2")),
         uiOutput("dgeModSelection"),
         br(),
-        div(style = "display:inline-block", checkboxInput("uploadModules", strong("Upload modules", style = "color:blue"), FALSE)),
+        div(style = "display:inline-block", checkboxInput("uploadModules", strong("Upload modules", style = "color:#456dae"), FALSE)),
         div(style = "display:inline-block", infoPopup("Upload modules", "Allows the user to provide their own list of modules (CSV) to plot. The CSV file should contain a single column named 'PROBE_ID' or 'SYMBOL', 
                                                       depending on whether the list provided is the PROBE ID's or gene symbols.", placement = "right", trigger = "click")),
         conditionalPanel(condition = "input.uploadModules",
@@ -155,16 +162,16 @@ shinyServer(function(input,output, session){
 
     if(!is.null(values$h3_rowdendro)){
       if(values$hc == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
+        try<-list("Baseline Mean Normalized" = 1,
                   "Baseline Healthy Normalized" = 2,
-                  "All Samples Median Normalized" = 3,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Healthy Normalized"= 4,
                   "All Samples Baseline Normalized"=5)
       }
 
       if(values$hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "All Samples Median Normalized" = 3,
+        try<-list("Baseline Mean Normalized" = 1,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Baseline Normalized"=5)
       }
     }
@@ -211,18 +218,9 @@ shinyServer(function(input,output, session){
     values$long_base <- NULL
     values$modules <- NULL
     values$roast_results <- NULL
-    values$numbGenes <- NULL
-    values$PaloValue <- NULL
-    values$quantileValue <- NULL
-    values$SDcutoff <- NULL
-    values$Approx_num_probes <- NULL
-    values$Filter_text <- NULL
-    values$BatchCorrectionTF <- NULL
-    values$Batch_Variable <- NULL
-    values$Batch_text <- NULL
-    values$MixedModelDescription <- NULL
+    values$dgeGeneSets <- NULL
+    values$dgeGeneSetAnnotations <- NULL
     setwd(route)
-
     for (var in vars){
       values[[var]] <- get(var, .GlobalEnv)
     }
@@ -254,7 +252,7 @@ shinyServer(function(input,output, session){
 
 
   ############ Design File and Summary Statistics ##############################
-
+  
   output$SumStat <- renderMenu({
     if(is.null(values$design)){
       return(strong(""))
@@ -328,76 +326,76 @@ shinyServer(function(input,output, session){
       }
     }
   })
-
-
+  
+  
   output$designDataTable<- renderDataTable({
     values$design
   })
-
+  
   output$downloadDesign <- downloadHandler(
-
+    
     filename = function() {paste(values$project_name,'_Design','.csv', sep='')  },
     content = function(file) {
       write.csv(values$design, file, row.names = FALSE)
     }
   )
-
+  
   output$downloadSummary0 <- downloadHandler(
-
+    
     filename = function() {'SummaryStats_Table1.csv'},
     content = function(file) {
       write.csv(table_0(), file, row.names = FALSE)
     }
   )
-
+  
   output$downloadSummary1 <- downloadHandler(
-
+    
     filename = function() {'SummaryStats_Table2.csv'},
     content = function(file){
       write.csv(table_1(), file,row.names = FALSE)
     }
   )
-
+  
   output$downloadSummary2 <- downloadHandler(
-
+    
     filename = function() {'SummaryStats_Table3.csv'},
     content = function(file) {
       write.csv(table_2(), file,row.names = FALSE)
     }
   )
-
+  
   output$summaryName<-renderUI({
     selectInput("summary_var", "Variable for summary statistics:", names(values$design),selected=values$summary_var)
   })
-
+  
   output$timeVar<-renderUI({
     selectInput("time_var", "Time variable:*", values$time_var,selected=values$time_var)
   })
-
+  
   output$respVar<-renderUI({
     selectInput("responder_var", "By variable (i.e. responder status):", names(values$design),selected=values$responder_var)
   })
-
+  
   output$patientVar<-renderUI({
     selectInput("patient_id", "Patient ID variable:*", values$patient_id,selected=values$patient_id)
   })
-
+  
   output$summary0Text<-renderUI({
     HTML(paste(strong("Table 1:"), "Summary statistics by", input$responder_var, "for",input$summary_var,sep=" "))
   })
-
+  
   output$summary1Text<-renderUI({
     HTML(paste(strong("Table 2: "), "Summary statistics by Time and", input$responder_var, "for",input$summary_var,sep=" "))
   })
-
+  
   output$summary2Text <- renderUI({
     HTML(paste(strong("Table 3: "), "Frequency of Longitudinal Profiles by", input$responder_var, sep = " "))
   })
-
+  
   data_unique <- reactive({
     values$design[!duplicated(values$design[, values$patient_id]), ]
   })
-
+  
   table0_cont <- reactive({
     sum0 <- aggregate(as.formula(paste(input$summary_var, "~", values$patient_id)), data = values$design, sd)
     sum0 <- as.data.frame(sum0)
@@ -405,7 +403,7 @@ shinyServer(function(input,output, session){
       mysummary<-function(x){y<-c(length(x),mean(x),median(x),sd(x),min(x),max(x))
       names(y)<-c("N","Mean","Median","Sd","Min.","Max.")
       return(y)}
-
+      
       sum1<-aggregate(as.formula(paste(input$summary_var,"~",input$responder_var)), data= data_unique(), mysummary)
       summaries<- as.data.frame(sum1[,2])
       result<-as.data.frame(cbind(sum1[,c(1)],summaries))
@@ -416,7 +414,7 @@ shinyServer(function(input,output, session){
       result <- data.frame(Warning = "Variable is time dependent. Look at table below.")
     }
   })
-
+  
   table0_cat <- reactive({
     sum0 <- aggregate(as.formula(paste(input$summary_var, "~", values$patient_id)), data = values$design, summary)
     sum01 <- sum0[,2]
@@ -424,43 +422,43 @@ shinyServer(function(input,output, session){
     sums <- apply(sum01, 1, sum)
     check <- F
     if(all(sums == 1)) {check <- T}
-
+    
     if(check == T){
-
+      
       mysummary<-function(x){y<-summary(x)
       y<-c(length(x),y)
       names(y)<-c("N", names(summary(x)))
       return(y)}
-
+      
       sum1<-aggregate(as.formula(paste(input$summary_var,"~",input$responder_var)), data = data_unique(), mysummary)
       summaries<- as.data.frame(sum1[,2])
       summaries2 = list()
       for(i in 1:nrow(summaries[,-1])){
         summaries2[[i]] = paste(summaries[i,-1], " ", "(", round(100*(summaries[i,-1]/summaries[i,1]), 2), "%",")", sep = "")
       }
-
+      
       summaries2 = do.call("rbind", summaries2)
-
+      
       result<- cbind(as.data.frame(sum1[,1]),summaries[,1], summaries2)
       names(result)<-c("Responder Status", "N", names(summaries[,-1]))
       result
     }
-
+    
     else{
       result <- data.frame(Warning = "Variable is time dependent. Look at table below.")
     }
   })
-
+  
   table_0 <- reactive({
     if(is.numeric(values$design[[input$summary_var]])){
       table0_cont()
     }
-
+    
     else{
       table0_cat()
     }
   })
-
+  
   table_1 <- reactive({
     if(is.numeric(values$design[[input$summary_var]])){
       mysummary<-function(x){y <- c(length(x), mean(x), median(x), sd(x), min(x), max(x))
@@ -468,12 +466,12 @@ shinyServer(function(input,output, session){
       return(y)}
       sum1<-aggregate(as.formula(paste(input$summary_var,"~",values$time_var,"+",input$responder_var)), data = values$design, mysummary)
       summaries<- as.data.frame(sum1[,3])
-
+      
       result<- data.frame(cbind(sum1[,c(1,2)],summaries))
       names(result)<-c("Time","Responder Status",colnames(summaries))
       result
     }
-
+    
     else{
       mysummary<-function(x){y<-summary(x)
       y<-c(length(x),y)
@@ -486,22 +484,22 @@ shinyServer(function(input,output, session){
       result
     }
   })
-
+  
   table_2 <- reactive({
     x<-values$design
     names(x)[which(names(x)==values$time_var)]<-"Time"
     names(x)[which(names(x)==input$responder_var)]<-"Responder"
     names(x)[which(names(x)==values$patient_id)]<-"PATIENT_ID"
-
+    
     timelevel<-unique(x$Time[order(x$Time)])
     x$Time2<-factor(x$Time,levels=timelevel)
     freqs<-aggregate(Time2~PATIENT_ID,data=x,table)
-
+    
     y<-unlist(apply(as.matrix(freqs[,-1]),1,function(x){paste(timelevel[which(x>0)],collapse=",")}))
-
+    
     newx<-data.frame(freqs[,1],y)
     names(newx)<-c("PATIENT_ID","course")
-
+    
     dum<-c()
     for(i in 1:dim(newx)[1]){
       dum[i]<-which(x$PATIENT_ID==newx$PATIENT_ID[i])[1]}
@@ -510,33 +508,33 @@ shinyServer(function(input,output, session){
     newx<-data.frame(newx,x$Responder[dum])
     names(newx)<-c(n1,n2)
     z<-aggregate(Responder~course,data=newx,table)
-
+    
     if(length(z[,2]) == 1){
       z2<- as.data.frame(z[,2,drop = F])
     }
-
+    
     if(length(z[,2]) > 1){
       z2 <- as.data.frame(z[,2])
     }
-
+    
     z[,1] <- as.character(z[,1])
     sum_cols <- colSums(z2)
     result <- rbind(data.frame(z[,1], stringsAsFactors = F), "Total")
-
+    
     if(length(z[,2] == 1)){
       result2 <- rbind(data.frame(z[,2,drop = F]), sum_cols)
     }
-
+    
     if(length(z[,2]) > 1){
       result2 <- rbind(data.frame(z[,2]), sum_cols)
     }
-
+    
     result3<- data.frame(cbind(result,result2))
     names(result3)<-c("Time Course",colnames(z2))
     result3$Total <- rowSums(result3[,-1])
     result3
   })
-
+  
   dig <- function(){
     as.numeric(input$digits)
   }
@@ -551,9 +549,10 @@ shinyServer(function(input,output, session){
   
   output$summary2 <- renderTable({
     table_2()
-  }, digits = dig, include.rownames = FALSE)
-
-
+  }, digits = 0,include.rownames = FALSE)
+  
+  
+  
   ################# PVCA ##################################
 
   output$PVCA1 <- renderImage({
@@ -739,27 +738,27 @@ output$Unsupervised <- renderMenu({
   
   if(is.null(values$long_base) & is.null(values$long_ctrl) & is.null(values$base_ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Probe Level Heat Maps", tabName = "probeheatmap"))
+                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"))
     )
   }
   
   if(is.null(values$long_base) & is.null(values$long_ctrl) & !is.null(values$base_ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Probe Level Heat Maps", tabName = "probeheatmap"),
+                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
                     menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
     )
   }
   
   if((!is.null(values$long_base) | !is.null(values$long_ctrl)) & is.null(values$base_ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Probe Level Heat Maps", tabName = "probeheatmap"),
+                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
                     menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
     )
   }
   
   if((!is.null(values$long_base) | !is.null(values$long_ctrl)) & !is.null(values$base_ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Probe Level Heat Maps", tabName = "probeheatmap"),
+                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
                     menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
     )
   }
@@ -857,8 +856,8 @@ output$Unsupervised <- renderMenu({
   modWidth <- function(){modGraphParams()$width}
   modHeight <- function(){modGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "modSubOrder", des = reactive(values$design), groupingVar = reactive(values$responder_var))
-  callModule(clusterAssociationRenderUI, "modAssociation", data = reactive(values$design), groupingVar = reactive(values$responder_var))
+  callModule(subsetAndOrderRenderUI, "modSubOrder", des = reactive(values$design))
+  callModule(clusterAssociationRenderUI, "modAssociation", data = reactive(values$design))
   
   modRowCluster <- eventReactive(input$goMod,{
     dat<- callModule(uploadVarsRowCluster, "mod", data = reactive(modData()$dat), dendro = reactive(modData()$ddm))
@@ -881,7 +880,7 @@ output$Unsupervised <- renderMenu({
   
   modOrderedData <- eventReactive(input$goMod,{
     dat <- callModule(subsetAndOrder, "modSubOrder", des = reactive(modData()$des), data = reactive(modRowCluster()$x), 
-                      sampleAnnot = reactive(values$sample_id), groupingVar = reactive(values$responder_var))
+                      sampleAnnot = reactive(values$sample_id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -900,8 +899,6 @@ output$Unsupervised <- renderMenu({
                    aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                              annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
                              breaks=0)
-                   #x <- heatmapr(modOrderedData()$x)
-                   #heatmaply(modOrderedData()$x, node_type = "scatter")
                  }
     )
   }, width = modWidth, height = modHeight)
@@ -1069,11 +1066,15 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
+  resolution <- reactive({
+    params <- callModule(graphOptions, "unsupervisedGraphOptions")
+    return(params$resolution)
+  })
   plotWidth <- function(){graphParams()$width}
   plotHeight <- function(){graphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "unsupervisedSubOrder", des = reactive(values$design), groupingVar = reactive(values$responder_var))
-  callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(values$design), groupingVar = reactive(values$responder_var))
+  callModule(subsetAndOrderRenderUI, "unsupervisedSubOrder", des = reactive(values$design))
+  callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(values$design))
   
   rowCluster <- eventReactive(input$go, {
     dat<- callModule(uploadVarsRowCluster, "transcripts", data = reactive(heatmapdata()$y$heatexp), dendro = reactive(heatmapdata()$ddm))
@@ -1096,7 +1097,7 @@ output$Unsupervised <- renderMenu({
 
   orderedData <- reactive({
     dat <- callModule(subsetAndOrder, "unsupervisedSubOrder", des = reactive(heatmapdata()$y$heatdes), data = reactive(rowCluster()$x), 
-                    sampleAnnot = reactive(values$sample_id), groupingVar = reactive(values$responder_var))
+                    sampleAnnot = reactive(values$sample_id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -1124,18 +1125,18 @@ output$Unsupervised <- renderMenu({
     )
   }, width = plotWidth, height = plotHeight)
   
-  output$downloadModPlot4 <- downloadHandler(
+  output$downloadHeatmap <- downloadHandler(
     filename = function() {paste('Gene_Level_Heatmap','.png', sep = '')},
     content = function(file){
-      png(file, width = (plotresolution2()/72)*plot_width(), height = (plotresolution2()/72)*plot_height(), res = plotresolution2())
-        print(aheatmap2(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow = 1.2, 
-                        annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows, 
+      png(file, width = (resolution()/72)*graphParams()$width, height = (resolution()/72)*graphParams()$height, res = resolution())
+        print(aheatmap2(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
+                        annheight = graphParams()$legendSize,color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows, 
                         breaks=0))
       dev.off()
     }
   )
   
-  output$downloadHeatmap <- downloadHandler(
+  output$downloadHeatmapData <- downloadHandler(
     filename = function() {paste(values$project_name,'_',heatmapname(),'.csv', sep='')  },
     content = function(file) {
       write.csv(heatDataDownload(), file, row.names = TRUE)
@@ -1163,14 +1164,14 @@ output$Unsupervised <- renderMenu({
 
 
   output$clusterPlot <- renderPlot({
-    barplot(clusterData()$d, names.arg = 2:round(nrow(orderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index")
+    barplot(clusterData()$d, names.arg = 2:round(nrow(orderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn Index",main = "Dunn Index for Cluster Number Selection", cex.main = 1.5, col = "#4ba9d6")
   })
 
   output$downloadClusterPlot3 <- downloadHandler(
-    filename = function() {paste('Cluster_Plot_ProbeLevel','.png', sep = '')},
+    filename = function() {paste('DunnIndexPlot','.png', sep = '')},
     content = function(file){
       png(file, width = 800)
-      print(barplot(opt_NumClust2()$d, names.arg = 2:round(nrow(heatmap_order()$design_ordered)/2), xlab = "Number of Clusters", ylab = "Dunn's Index"))
+      print(barplot(clusterData()$d, names.arg = 2:round(nrow(orderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index", col = "#4ba9d6"))
       dev.off()
     }
   )
@@ -1239,66 +1240,41 @@ output$Unsupervised <- renderMenu({
 
   siglist <- reactive({
     results_file <- values$results_file
-    sigcomp0 <- results_file[grep(("PROBE_ID|Estimate of|Test.statistic|P.Value"), names(results_file))]
-    sigcomp1 <- sigcomp0[grep("Estimate of", names(sigcomp0))]
-    sigcomp2 <- sigcomp0[grep("P.Value", names(sigcomp0))]
-    sigcomp3 <- data.frame(apply(sigcomp2, 2, p.adjust, method="fdr"))
-    colnames(sigcomp3) <- gsub("P.Value","FDR.P.Value",colnames(sigcomp3))
-    sigcomp4 <- data.frame(apply(sigcomp2, 2, p.adjust, method="bonferroni"))
-    colnames(sigcomp4) <- gsub("P.Value","Bonf.P.Value",colnames(sigcomp4))
-
-    TF_Raw <- data.frame(sigcomp2 <= input$alphalevel2)
-    TF_FDR <- data.frame(sigcomp3 <= input$alphalevel2)
-    TF_Bonf <- data.frame(sigcomp4 <= input$alphalevel2)
-    TF_Raw1 <- data.frame(sigcomp2 <= input$alphalevel2)
-    TF_FDR1 <- data.frame(sigcomp3 <= input$alphalevel2)
-    TF_Bonf1 <- data.frame(sigcomp4 <= input$alphalevel2)
-    TF_p <- data.frame(sigcomp1 > 0)
-    TF_pRaw <- TF_Raw + TF_p
-    TF_pFDR <- TF_FDR + TF_p
-    TF_pBonf <- TF_Bonf + TF_p
-    TF_n <- data.frame(sigcomp1 < 0)
-    TF_nRaw <- TF_Raw + TF_n
-    TF_nFDR <- TF_FDR + TF_n
-    TF_nBonf <- TF_Bonf + TF_n
-    if(input$sigsign == "All (include 0)"){
-      Raw <- apply(sigcomp2, 2, function(x) sum(x[!is.na(x)] < input$alphalevel2))
-      names(Raw) <- gsub("P.Value for ", "", names(Raw))
-      FDR <- apply(sigcomp3, 2, function(x) sum(x[!is.na(x)] < input$alphalevel2))
-      names(FDR) <- gsub("FDR.P.Value.for.", "", names(FDR))
-      Bonf <- apply(sigcomp4, 2, function(x) sum(x[!is.na(x)] < input$alphalevel2))
-      names(Bonf) <- gsub("Bonf.P.Value.for.", "", names(Bonf))
-      sigtab <- rbind(Raw, FDR, Bonf)
+    estimates <- results_file[,grep("Estimate of", names(results_file))]
+    pvals <- results_file[,grep("P.Value", names(results_file))]
+    fdr.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "fdr"))
+    colnames(fdr.pvals) <- gsub("P.Value","FDR.P.Value",colnames(fdr.pvals))
+    bonf.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "bonferroni"))
+    colnames(bonf.pvals) <- gsub("P.Value","Bonf.P.Value",colnames(bonf.pvals))
+    comparisons <- gsub("Estimate of ", "", colnames(estimates))
+    raw <- fdr <- bonf <- c()
+    if(input$overviewFc){
+      if(input$selectFcSign == "+"){
+        for(i in 1:ncol(estimates)){
+          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
+          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
+          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
+        }
+      } else if(input$selectFcSign == "-"){
+        for(i in 1:ncol(estimates)){
+          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
+          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
+          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
+        }
+      } else{
+        for(i in 1:ncol(estimates)){
+          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
+          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
+          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
+        }
+      }
+    } else{
+      raw <- apply(pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
+      fdr <- apply(fdr.pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
+      bonf <- apply(bonf.pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
     }
-
-    if(input$sigsign == "+"){
-      Raw <- apply(TF_pRaw, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(Raw) <- gsub("P.Value for ", "", names(Raw))
-      FDR <- apply(TF_pFDR, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(FDR) <- gsub("FDR.P.Value.for.", "", names(FDR))
-      Bonf <- apply(TF_pBonf, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(Bonf) <- gsub("Bonf.P.Value.for.", "", names(Bonf))
-      sigtab <- rbind(Raw, FDR, Bonf)
-    }
-
-    if(input$sigsign == "-"){
-      Raw <- apply(TF_nRaw, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(Raw) <- gsub("P.Value for ", "", names(Raw))
-      FDR <- apply(TF_nFDR, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(FDR) <- gsub("FDR.P.Value.for.", "", names(FDR))
-      Bonf <- apply(TF_nBonf, 2, function(x) sum(x[!is.na(x)] == 2))
-      names(Bonf) <- gsub("Bonf.P.Value.for.", "", names(Bonf))
-      sigtab <- rbind(Raw, FDR, Bonf)
-    }
-    x <- t(sigtab)
-    y <- cbind(Comparison = rownames(x), x)
-    rownames(y) <- NULL
-    z <- data.frame(y)
-    for(i in 2:4){
-      z[, i] <- as.numeric(levels(z[, i])[z[, i]])
-    }
-    y <- list(z = z, TF_Raw = TF_Raw, TF_FDR = TF_FDR, TF_Bonf = TF_Bonf, TF_Raw1 = TF_Raw1, TF_FDR1 = TF_FDR1, TF_Bonf1 = TF_Bonf1)
-
+    overview <- data.frame(Comparison = comparisons, Raw = raw, FDR = fdr, Bonf = bonf)
+    y <- list(z = overview)
     return(y)
   })
 
@@ -1310,7 +1286,15 @@ output$Unsupervised <- renderMenu({
   })
   
   index <- reactive({
-    which(names(values$results_file)==pcomp())
+    which(names(values$results_file)== paste0("P.Value for ",input$diagnosticsComparison))
+  })
+  
+  output$diagnosticsComparison <- renderUI({
+    nam <- names(values$results_file)
+    index <- grep("P.Value",nam,fixed=T)
+    p.names <- nam[index]
+    p.names <- gsub("P.Value for ", "", p.names)
+    return(selectizeInput("diagnosticsComparison", "Comparison:", p.names, p.names[1], multiple = FALSE))
   })
   
   pcomp <- reactive({
@@ -1319,7 +1303,7 @@ output$Unsupervised <- renderMenu({
   })
 
   plottitle1 <- reactive({
-    paste("Distribution of Raw p-values for", input$comparison)
+    paste("Distribution of Raw p-values for", input$diagnosticsComparison)
   })
 
   output$distplot<-renderPlot({
@@ -1443,6 +1427,11 @@ output$Unsupervised <- renderMenu({
     plotOutput('modMap')
   })
   
+  output$modmaplmmres <- renderUI({
+    if(!values$baylorMod){return(NULL)}
+    numericInput('modmaplmmres', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1)
+  })
+  
   output$modMap <- renderPlot({
     ModMap_Comparison()
   }, width = 700, height = 190)
@@ -1460,9 +1449,37 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
+  
+  output$merge <- renderUI({
+    if(!is.null(values$dgeGeneSets)){
+      return(checkboxInput("merge", "Merge gene set information", FALSE))
+    } else{
+      return(NULL)
+    }
+  })
+  
+  mergeDgeGeneSet <- reactive({
+    x <- reshape2::melt(values$dgeGeneSets)
+    x <- x[,c(2,1)]
+    colnames(x) <- c("Gene.Set", "Gene")
+    if(!is.null(values$dgeGeneSetAnnotations)){
+      y <- values$dgeGeneSetAnnotations
+      colnames(y) <- c("Gene.Set", "Annotation")
+      x <- merge(x, y, by = "Gene.Set", all = TRUE)
+    }
+    return(x)
+  })
 
   output$genelisttable <-renderDataTable({
     y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), comparison = reactive(input$comparison),"genes")
+    if(!is.null(values$dgeGeneSets)){
+      if(input$merge){
+        x <- mergeDgeGeneSet()[!duplicated(mergeDgeGeneSet()[,2]),]
+        colnames(x)[2] <- "PROBE_ID"
+        mergeData <- merge(y, x, by = "PROBE_ID", all.x = TRUE)[,-c(1:ncol(y)),drop = FALSE]
+        y <- cbind(y[,c(1,2)],mergeData, y[,c(3:ncol(y))])
+      }
+    }
     y$SYMBOL <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$SYMBOL," target = '_blank'",'>',y$SYMBOL,"</a>",sep='')
     escape = FALSE
     y
@@ -1478,24 +1495,24 @@ output$Unsupervised <- renderMenu({
   output$test1<-renderUI({
     if(is.null(values$h3_rowdendro)){
       if(values$hc == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
+        try<-list("Baseline Mean Normalized" = 1,
                   "Baseline Healthy Normalized" = 2)
       }
       if(values$hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1)
+        try<-list("Baseline Mean Normalized" = 1)
       }
     }
     if(!is.null(values$h3_rowdendro)){
       if(values$hc == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
+        try<-list("Baseline Mean Normalized" = 1,
                   "Baseline Healthy Normalized" = 2,
-                  "All Samples Median Normalized" = 3,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Healthy Normalized"=4,
                   "All Samples Baseline Normalized"=5)
       }
       if(values$hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "All Samples Median Normalized" = 3,
+        try<-list("Baseline Mean Normalized" = 1,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Baseline Normalized"=5)
       }
     }
@@ -1576,7 +1593,7 @@ output$Unsupervised <- renderMenu({
   dgePlotWidth <- function(){dgeGraphParams()$width}
   dgePlotHeight <- function(){dgeGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "dgeSubOrder", des = reactive(values$design), groupingVar = reactive(values$responder_var))
+  callModule(subsetAndOrderRenderUI, "dgeSubOrder", des = reactive(values$design))
   
   dgeRowCluster <- eventReactive(input$go2, {
     x <- heatmapdata2()$y$heatexp 
@@ -1600,7 +1617,7 @@ output$Unsupervised <- renderMenu({
   
   dgeOrderedData <- reactive({
     dat <- callModule(subsetAndOrder, "dgeSubOrder", des = reactive(heatmapdata2()$y$heatdes), data = reactive(dgeRowCluster()$x), 
-                      sampleAnnot = reactive(values$sample_id), groupingVar = reactive(values$responder_var))
+                      sampleAnnot = reactive(values$sample_id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -2219,14 +2236,14 @@ output$Unsupervised <- renderMenu({
     }
     bonf <- unlist(bonf)
     master$Bonf <- bonf
-    n2 <- length(module_annotations[,1])
+    n2 <- length(values$dgeGeneSetAnnotations[,1])
     mod.ann <- list()
     master$Modulev2_Annotation <- ""
     for(i in 1:n2){
-      mod.ann[[i]] <- which(master$pathway.name %in% module_annotations[,1][i])
+      mod.ann[[i]] <- which(master$pathway.name %in% values$dgeGeneSetAnnotations[,1][i])
     }
     for(i in 1:n2){
-      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(module_annotations[,2][i])
+      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$dgeGeneSetAnnotations[,2][i])
     }
     return(master)
   })
@@ -2442,7 +2459,7 @@ output$Module_Select <- renderUI({
     if(is.null(comp_subset1())){return(NULL)}
 
     if(input$only_annotated){
-      comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
+      comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
     }
     else{
       comp_subset1 <- comp_subset1()
@@ -2504,14 +2521,21 @@ output$Module_Select <- renderUI({
       else{
         line_colors = input$ColorChoice1
       }
-      qusage_plot = ggplot(data = comp_subset1, aes(x = factor(Index), y = Log2FC, ymin = ylow, ymax = yhigh))
-      qusage_plot = qusage_plot + scale_x_discrete(breaks = 1:length(comp_subset1$Index), labels = as.character.factor(comp_subset1$pathway.name[comp_subset1$Index]))
+      if(input$showAnnotated){
+        comp_subset1$pathway.name <- factor(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = " "), levels = unique(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = " ")))
+      }
+      #qusage_plot = ggplot(data = comp_subset1, aes(x = factor(Index), y = Log2FC, ymin = ylow, ymax = yhigh))
+      qusage_plot = ggplot(data = comp_subset1, aes(x = pathway.name, y = Log2FC, ymin = ylow, ymax = yhigh))
+      qusage_plot = qusage_plot + scale_x_discrete(labels = as.character(unique(comp_subset1$pathway.name)))
+      #qusage_plot = qusage_plot + scale_x_discrete(breaks = 1:length(comp_subset1$Index), labels = as.character.factor(comp_subset1$pathway.name[comp_subset1$Index]))
       qusage_plot = qusage_plot + xlab("Modules") + ylab("Pathway Activity")
       qusage_plot = qusage_plot + scale_colour_manual(values = line_colors) + geom_line(aes(colour = Comparison, group = Comparison), size = 1) + geom_hline(yintercept = 0, colour = "black", size = .5)
       qusage_plot = qusage_plot + geom_point(aes(shape = SIG), size = 2) + scale_shape_manual(values = c(16,8))
     }
-
     else{
+      if(input$showAnnotated){
+        comp_subset1$pathway.name <- factor(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = "_"), levels = c(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = "_")))
+      }
       qusage_plot = qplot(x = pathway.name, y = Log2FC, data = comp_subset1, ymin = ylow, ymax = yhigh, ylab = "Pathway Activity", xlab = "Modules")
       qusage_plot = qusage_plot + geom_point() + geom_errorbar(data = comp_subset1, aes(x = pathway.name, y = Log2FC, ymin = low, ymax = up))
       qusage_plot = qusage_plot + geom_hline(yintercept = 0, colour = "red", size = 1)
@@ -2642,20 +2666,12 @@ output$Module_Select <- renderUI({
 
   output$MultipleCompTab <- renderDataTable({
     if(is.null(master())){return(NULL)}
-    if(input$only_annotated){
-      #if(is.null(values$BaylorTF)){
-        #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
-        #comp_subset1$pathway.name <- as.character(comp_subset1$pathway.name)
-        #annot <- which(paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ") %in% comp_subset1()$pathway.name)
-      #}
-      #else{
-        #if(values$BaylorTF == TRUE){
-          #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% paste(module_annotations$Modulev2_Annotation,module_annotations$Module,sep=" ")),]
-        #}
-        #else{
-          #comp_subset1 <- comp_subset1()[which(comp_subset1()$pathway.name %in% module_annotations$Module),]
-        #}
-      #}
+    if(!is.null(values$dgeGeneSetAnnotations)){
+      if(input$only_annotated){
+        comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
+      } else{
+        comp_subset1 <- comp_subset1()
+      }
     }
     else{
       comp_subset1 <- comp_subset1()
@@ -3369,16 +3385,16 @@ output$Module_Select <- renderUI({
 
     if(!is.null(values$h3_rowdendro)){
       if(values$m_hc == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
+        try<-list("Baseline Mean Normalized" = 1,
                   "Baseline Healthy Normalized" = 2,
-                  "All Samples Median Normalized" = 3,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Healthy Normalized"=4,
                   "All Samples Baseline Normalized"=5)
       }
 
       if(values$m_hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "All Samples Median Normalized" = 3,
+        try<-list("Baseline Mean Normalized" = 1,
+                  "All Samples Mean Normalized" = 3,
                   "All Samples Baseline Normalized"=5)
       }
     }
@@ -3467,7 +3483,7 @@ output$Module_Select <- renderUI({
   metabPlotWidth <- function(){metabGraphParams()$width}
   metabPlotHeight <- function(){metabGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "metabSubOrder", des = reactive(values$m_design), groupingVar = reactive(values$m_responder_var))
+  callModule(subsetAndOrderRenderUI, "metabSubOrder", des = reactive(values$m_design))
   
   metabRowCluster <- eventReactive(input$go4, {
     x <- heatmapdatam()$y$heatexp 
@@ -3491,7 +3507,7 @@ output$Module_Select <- renderUI({
   
   metabOrderedData <- reactive({
     dat <- callModule(subsetAndOrder, "metabSubOrder", des = reactive(heatmapdatam()$y$heatdes), data = reactive(metabRowCluster()$x), 
-                      sampleAnnot = reactive(values$m_sample_id), groupingVar = reactive(values$m_responder_var))
+                      sampleAnnot = reactive(values$m_sample_id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -3593,30 +3609,29 @@ output$Module_Select <- renderUI({
 
   ############# END OF METABOLOMICS PART ################
 
-###############Correlations########################
-
+  ###############Correlations########################
+  
   output$correlations <- renderMenu({
     if(is.null(values$correlations)){
-      #return(menuItem(strong("Flow", style = "color:red"), tabName = ""))
       return(strong(""))
     }
     else{
       return(menuItem("Correlations", icon = icon("bolt"), tabName = "corr"))
     }
   })
-
+  
   output$TypeVariable <- renderUI({
     selectInput("TypeVariable1", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
-
+  
   output$TypeVariable2 <- renderUI({
     selectInput("TypeVariable3", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
-
+  
   output$TypeVariable4 <- renderUI({
     selectInput("TypeVariable5", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
-
+  
   output$TypeVariable6 <- renderUI({
     selectInput("TypeVariable7", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
   })
@@ -3628,12 +3643,13 @@ output$Module_Select <- renderUI({
   corrResultsOverview <- reactive({
     correlations <- results <- Raw <- FDR <- Bonf <- list()
     for(i in 1:length(values$correlations)){
-      corrs <- data.table::as.data.table(values$correlations[[i]])
+      corrs <- data.table::as.data.table(values$correlations[[i]][,c(2,1,3:ncol(values$correlations[[i]]))])
       corrs$FDR <- 1
       corrs$Bonf <- 1
       corrs[,FDR := p.adjust(Raw.P.Value, method = "fdr"), by = c(names(corrs)[c(2,3)])]
       corrs[,Bonf := p.adjust(Raw.P.Value, method = "bonferroni"), by = c(names(corrs)[c(2,3)])]
       corrs <- as.data.frame(corrs)
+      corrs <- corrs[,c(2,1,3:ncol(corrs))]
       comps <- raw <- fdr <- bonf <- c()
       for(j in 1:length(unique(values$correlations[[i]][,3]))){
         comps[j] <- paste0(values$correlation_names[i],"_",as.character(unique(values$correlations[[i]][,3])[j]))
@@ -3672,7 +3688,7 @@ output$Module_Select <- renderUI({
       write.csv(corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),], file, row.names = FALSE)
     }
   )
-
+  
   output$subsetcorr <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
@@ -3684,7 +3700,7 @@ output$Module_Select <- renderUI({
     visit <- gtools::mixedsort(as.character(visit))
     selectInput("subsetcorr1", "", choices = visit, selected = visit, multiple = TRUE)
   })
-
+  
   output$WithVariable1 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
@@ -3693,7 +3709,7 @@ output$Module_Select <- renderUI({
     }
     selectInput("WithVariable", "Choose Correlation Variable(s):", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = gtools::mixedsort(unique(correlations$With))[1], multiple = TRUE)
   })
-
+  
   output$WithVariable2 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable3)]]
     if(input$var_switch2 == TRUE){
@@ -3702,17 +3718,17 @@ output$Module_Select <- renderUI({
     }
     selectInput("WithVariable3", "Choose Correlation Variable(s):", choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
-
+  
   output$corr_Variable <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     selectInput("corr_Variable2", paste("Choose", values$y_var[which(values$correlation_names == input$TypeVariable7)], "Variable:", sep = " "), choices = as.character(gtools::mixedsort(unique(correlations$Variable))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
-
+  
   output$WithVariable4 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     selectInput("WithVariable5", paste("Choose ", values$x_var[which(values$correlation_names == input$TypeVariable7)], " Variable:", sep = ""), choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
-
+  
   output$uploadmod1 <- renderUI({
     if(input$var_switch == FALSE){
       return(checkboxInput("uploadmod", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
@@ -3720,7 +3736,7 @@ output$Module_Select <- renderUI({
       return(checkboxInput("uploadmod", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
-
+  
   output$fileupload1 <- renderUI({
     if(input$uploadmod == TRUE){
       return(fileInput('modselect', '', accept = ".csv"))
@@ -3729,7 +3745,7 @@ output$Module_Select <- renderUI({
       return(NULL)
     }
   })
-
+  
   output$uploadmod3 <- renderUI({
     if(input$var_switch3 == FALSE){
       return(checkboxInput("uploadmod2", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
@@ -3737,7 +3753,7 @@ output$Module_Select <- renderUI({
       return(checkboxInput("uploadmod2", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
-
+  
   output$fileupload2 <- renderUI({
     if(input$uploadmod2 == TRUE){
       return(fileInput('modselect2', '', accept = ".csv"))
@@ -3746,7 +3762,7 @@ output$Module_Select <- renderUI({
       return(NULL)
     }
   })
-
+  
   heatmap.data <- reactive({
     correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
@@ -3758,19 +3774,19 @@ output$Module_Select <- renderUI({
       modnames.corr <- as.character(modnames.corr[,1])
       modnames.corr <- gsub(".", "_", modnames.corr,fixed = TRUE)
       correlations <- correlations[which(correlations$Variable %in% modnames.corr),]
-
+      
       col_anno <- list()
       col_anno2 <- list()
       dat <- list()
       dat2 <- list()
       keep_names <- list()
-
+      
       names <- gtools::mixedsort(unique(as.character(correlations[,3])))
-
+      
       if(input$subsetModcorr == TRUE){
         names <- input$subsetcorr1
       }
-
+      
       for(j in 1:length(input$WithVariable)){
         correlations1 <- correlations[which(correlations$With %in% input$WithVariable[j]),]
         for(i in 1:length(names)){
@@ -3778,12 +3794,12 @@ output$Module_Select <- renderUI({
           dat[[i]] <- dat[[i]][which(dat[[i]]$Variable %in% modnames.corr),]
           dat[[i]] <- as.character(dat[[i]]$Variable)
         }
-
+        
         keep_names[[j]] <- Reduce(intersect, dat)
       }
-
+      
       keep_names <- unlist(keep_names)
-
+      
       for(j in 1:length(input$WithVariable)){
         correlations1 <- correlations[which(correlations$With %in% input$WithVariable[j]),]
         for(i in 1:length(names)){
@@ -3793,13 +3809,13 @@ output$Module_Select <- renderUI({
           dat[[i]] <- dat[[i]][,4]
           col_anno[[i]] <- input$WithVariable[j]
         }
-
+        
         col_anno2[[j]] <- unlist(col_anno)
         dat2[[j]] <- do.call("cbind", dat)
         rownames(dat2[[j]]) <- sort(unique(keep_names))
         colnames(dat2[[j]]) <- names
       }
-
+      
       col_anno <- data.frame(unlist(col_anno2))
       colnames(col_anno)[1] <- paste(values$x_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
       if(input$var_switch){
@@ -3811,19 +3827,19 @@ output$Module_Select <- renderUI({
       dat3 <- list()
       colnames3 <- list()
       rownames3 <- list()
-
+      
       for(j in 1:length(input$WithVariable)){
         correlations1 <- correlations[which(correlations$With %in% input$WithVariable[j]),]
-
+        
         dat <- list()
         sig <- list()
         cor_vals <- list()
         names <- gtools::mixedsort(unique(as.character(correlations1[,3])))
-
+        
         if(input$subsetModcorr == TRUE){
           names <- input$subsetcorr1
         }
-
+        
         if(input$corrval2 == TRUE){
           if(input$corrsign1 == "+"){
             for(i in 1:length(names)){
@@ -3846,48 +3862,48 @@ output$Module_Select <- renderUI({
               cor_vals[[i]] <- as.character(cor_vals[[i]]$Variable)
             }
           }
-
+          
           cor_vals <- Reduce(union,cor_vals)
           correlations1 <- correlations1[which(correlations1$Variable %in% cor_vals),]
         }
-
+        
         for(i in 1:length(names)){
           dat[[i]] <- correlations1[which(correlations1[,3] == names[i]),]
-
+          
           if(input$correction_method.corr == "Raw"){
             sig[[i]] <- dat[[i]][which(dat[[i]]$Raw.P.Value <= input$Alpha1),]
           }
-
+          
           if(input$correction_method.corr == "FDR"){
             sig[[i]] <- dat[[i]][which(dat[[i]]$FDR <= input$Alpha1),]
           }
-
+          
           if(input$correction_method.corr == "Bonferroni"){
             sig[[i]] <- dat[[i]][which(dat[[i]]$Bonf <= input$Alpha1),]
           }
-
+          
           sig[[i]] <- as.character(sig[[i]]$Variable)
         }
-
+        
         sigvars <- Reduce(union,sig)
-
+        
         correlations1 <- correlations1[which(correlations1$Variable %in% sigvars),]
-
+        
         dat2 <- list()
         for(i in 1:length(names)){
           dat2[[i]] <- correlations1[which(correlations1[,3] == names[i]),]
           dat2[[i]] <- dat2[[i]][which(dat2[[i]]$Variable %in% sigvars),]$Variable
         }
-
+        
         dat2 <- Reduce(intersect, dat2)
-
+        
         for(i in 1:length(names)){
           dat[[i]] <- correlations1[which(correlations1[,3] == names[i]),]
           dat[[i]] <- dat[[i]][which(dat[[i]]$Variable %in% dat2),]
           dat[[i]] <- dat[[i]][order(dat[[i]]$Variable),]
           dat[[i]] <- dat[[i]][,4]
         }
-
+        
         dat3[[j]] <- do.call("cbind", dat)
         colnames(dat3[[j]]) <- names
         rownames(dat3[[j]]) <- sort(dat2)
@@ -3898,7 +3914,7 @@ output$Module_Select <- renderUI({
       dat2 <- list()
       col_anno <- list()
       col_anno2 <- list()
-
+      
       for(j in 1:length(input$WithVariable)){
         correlations1 <- correlations[which(correlations$With %in% input$WithVariable[j]),]
         dat <- list()
@@ -3909,7 +3925,7 @@ output$Module_Select <- renderUI({
           dat[[i]] <- dat[[i]][,4]
           col_anno[[i]] <- input$WithVariable[j]
         }
-
+        
         col_anno2[[j]] <- unlist(col_anno)
         dat2[[j]] <- do.call("cbind",dat)
         rownames(dat2[[j]]) <- sort(rownames3)
@@ -3923,54 +3939,54 @@ output$Module_Select <- renderUI({
       }
       z <- list(col_anno = col_anno, dat = dat)
     }
-
+    
     return(z)
   })
-
+  
   output$download_heatmap_data <- downloadHandler(
     filename = function() {paste(values$project_name, "_", "Correlation_heatmap_data.csv",sep = "")},
     content = function(file) {
       write.csv(heatmap.data()$dat, file, row.names = TRUE)
     }
   )
-
+  
   row_clust.corr <- reactive({
     if(input$rowclustcorr == TRUE){return(TRUE)}
     else{
       return(NA)
     }
   })
-
+  
   col_clust.corr <- reactive({
     if(input$colclustcorr == TRUE){return(TRUE)}
     else{
       return(NA)
     }
   })
-
+  
   height1 <- function(){
     input$PlotHeight4
   }
-
+  
   width1 <- function(){
     input$PlotWidth4
   }
-
+  
   rows.plot <- reactive({
     if(nrow(heatmap.data()$dat) > 300){return(NA)}
     else{return(NULL)}
   })
-
+  
   color.heatmap <- reactive({
     color_palette <- colorRampPalette(c("blue", "white", "red"))(1000)
     color_palette[c(495:505)] = "#FFFFFF"
     color_palette
   })
-
+  
   plotresolution.corr <- reactive({
     input$PlotRes4
   })
-
+  
   output$correlations_plotOverview <- renderPlot({
     if(ncol(heatmap.data()$dat) > 1){
       if(input$colorRange){
@@ -3989,14 +4005,14 @@ output$Module_Select <- renderUI({
                        annheight = input$corrLegendSize,Rowv = row_clust.corr(), breaks = c(-1,0,1)))
     }
   }, height = height1, width = width1)
-
+  
   output$download_corr_heatmap <- downloadHandler(
     filename = function() {paste(values$project_name,"_","Heatmap.png",sep = "")},
     content = function(file){
       png(file, width = (plotresolution.corr()/72)*width1(), height = (plotresolution.corr()/72)*height1(), res = plotresolution.corr())
       if(input$colorRange){
         print(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, annheight = input$corrLegendSize, 
-                         color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+                        color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
       } else{
         print(aheatmap2(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), 
                         annheight = input$corrLegendSize,border_color = "grey60", Rowv = row_clust.corr(), breaks = 0))
@@ -4004,9 +4020,9 @@ output$Module_Select <- renderUI({
       dev.off()
     }
   )
-
+  
   output$Visit <- renderUI({
-
+    
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable3)]]
     if(input$var_switch2 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
@@ -4017,22 +4033,22 @@ output$Module_Select <- renderUI({
     visit <- gtools::mixedsort(as.character(visit))
     selectInput("visit", paste("Correlations by"," ",visit.name, ":", sep = ""), choices = visit, selected = visit[1])
   })
-
+  
   sub.dat <- reactive({
     correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable3)]]
     if(input$var_switch2){
-    correlations <- correlations[,c(2,1,3:ncol(correlations))]
-    colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
+      correlations <- correlations[,c(2,1,3:ncol(correlations))]
+      colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
     correlations <- correlations[which(correlations$With == input$WithVariable3),]
     correlations <- correlations[which(correlations[,3] == input$visit),]
     z <- list(correlations = correlations)
     return(z)
   })
-
+  
   subset_correlations <- reactive({
     correlations <- sub.dat()$correlations
-
+    
     if(input$corrval == TRUE){
       if(input$corrsign == "+"){
         correlations <- correlations[which(correlations[,4] >= input$corrval1),]
@@ -4044,19 +4060,19 @@ output$Module_Select <- renderUI({
         correlations <- correlations[c(which(correlations[,4] <= -input$corrval1), which(correlations[,4] >= input$corrval1)),]
       }
     }
-
+    
     if(input$correction_method.corr2 == "Raw"){
       correlations <- correlations[which(correlations$Raw.P.Value <= input$Alpha),]
     }
-
+    
     if(input$correction_method.corr2 == "FDR"){
       correlations <- correlations[which(correlations$FDR <= input$Alpha),]
     }
-
+    
     if(input$correction_method.corr2 == "Bonferroni"){
       correlations <- correlations[which(correlations$Bonf <= input$Alpha),]
     }
-
+    
     correlations <- correlations[,-c(which(colnames(correlations) == "Base_subtracted"), which(colnames(correlations) == "NObs"),
                                      which(colnames(correlations) == "Sign_NegLog10_p"))]
     colnames(correlations)[1] <- values$y_var[which(values$correlation_names == input$TypeVariable3)]
@@ -4067,7 +4083,7 @@ output$Module_Select <- renderUI({
     }
     return(correlations)
   })
-
+  
   output$download_data <- downloadHandler(
     filename = function() {paste(values$project_name, "_", "Correlations_subset.csv")},
     content = function(file) {
@@ -4077,13 +4093,13 @@ output$Module_Select <- renderUI({
   
   output$var_switch2 <- renderUI({
     checkboxInput("var_switch2", strong(paste("Swap ",values$y_var[which(values$correlation_names == input$TypeVariable3)], " and ", values$x_var[which(values$correlation_names == input$TypeVariable3)], " columns", sep = "")),
-                                        value = FALSE)
+                  value = FALSE)
   })
-
+  
   output$correlation_table <- renderDataTable({
     subset_correlations()
   })
-
+  
   output$Visit2 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
@@ -4095,7 +4111,7 @@ output$Module_Select <- renderUI({
     visit <- gtools::mixedsort(as.character(visit))
     selectInput("visit2", paste("Correlations by", visit.name, ":", sep = " "), choices = visit, selected = visit[1])
   })
-
+  
   output$subsetcorr2 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
@@ -4105,7 +4121,7 @@ output$Module_Select <- renderUI({
     var <- as.character(sort(unique(correlations$With)))
     selectInput("subsetcorr3", paste("Subset by 'with' variable:",sep = ""), choices = var, selected = var[1:5], multiple = TRUE)
   })
-
+  
   correlation.data <- reactive({
     #correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
     correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable5)]]
@@ -4114,11 +4130,11 @@ output$Module_Select <- renderUI({
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
     }
     correlations <- correlations[which(correlations[,3] == input$visit2),]
-
+    
     if(input$subsetModcorr2 == TRUE){
       correlations <- correlations[which(correlations$With %in% input$subsetcorr3),]
     }
-
+    
     if(input$var_switch3 == TRUE){
       y <- values$x_var[which(values$correlation_names == input$TypeVariable5)]
       x <- values$y_var[which(values$correlation_names == input$TypeVariable5)]
@@ -4131,7 +4147,7 @@ output$Module_Select <- renderUI({
     cor_vals <- list()
     sig <- list()
     names <- as.character(unique(correlations$With))
-
+    
     if(input$corrval4 == TRUE){
       if(input$corrsign2 == "+"){
         for(i in 1:length(names)){
@@ -4154,12 +4170,12 @@ output$Module_Select <- renderUI({
           cor_vals[[i]] <- as.character(cor_vals[[i]]$Variable)
         }
       }
-
+      
       cor_vals <- Reduce(union,cor_vals)
       correlations <- correlations[which(correlations$Variable %in% cor_vals),]
     }
-
-
+    
+    
     for(i in 1:length(names)){
       dat[[i]] <- correlations[which(correlations$With == names[i]),]
       if(input$correction_method.corr3 == "Raw"){
@@ -4173,32 +4189,32 @@ output$Module_Select <- renderUI({
       }
       sig[[i]] <- as.character(sig[[i]]$Variable)
     }
-
+    
     sigvars <- Reduce(union,sig)
-
+    
     correlations <- correlations[which(correlations$Variable %in% sigvars),]
-
+    
     correlation.type <- colnames(correlations)[4]
-
+    
     if(input$uploadmod2 == TRUE){
       modnames.corr <- read.csv(input$modselect2$datapath, header = TRUE)
       modnames.corr <- as.character(modnames.corr[,1])
       modnames.corr <- gsub(".", "_", modnames.corr,fixed = TRUE)
       correlations <- correlations[which(correlations$Variable %in% modnames.corr),]
     }
-
+    
     n = length(unique(correlations$With))
     cor <- list()
     cor_sub <- list()
     names <- unique(correlations$With)
-
+    
     for(i in 1:n){
       cor[[i]] <- correlations[which(correlations$With == names[i]),]
-
+      
       if(i > 1){
         cor[[i]] <- cor[[i]][match(cor[[i-1]]$Variable, cor[[i]]$Variable, nomatch = 0),]
       }
-
+      
       if(input$correction_method.corr3 == "Raw"){
         cor_sub[[i]] <- cor[[i]][,which(colnames(cor[[i]]) %in% c(correlation.type, "Raw.P.Value"))]
       }
@@ -4210,12 +4226,12 @@ output$Module_Select <- renderUI({
       }
       colnames(cor_sub[[i]]) <- c(paste(names[i], "r.val", sep = "."), paste(names[i], "pVal", sep = "."))
     }
-
+    
     mat1 <- do.call("cbind", cor_sub)
     mat1 <- as.matrix(mat1)
     rownames(mat1) <- cor[[1]]$Variable
     mat1 <- as.data.frame(mat1)
-
+    
     t = mat1 #mat1 is what you created with the correlation script.
     t$modName<-rownames(t)
     t.pval=reshape2::melt(t[c(length(t),grep("pVal",colnames(t), fixed = TRUE))]) #combine all columns with "pVal" into one loooooong object.
@@ -4230,33 +4246,33 @@ output$Module_Select <- renderUI({
     if(input$correction_method.corr3 == "Bonferroni"){
       colnames(GraphFrame)=c(y,"Correlation","Bonf.pVal","rVal")  #change column names
     }
-
+    
     GraphFrame[,which(colnames(GraphFrame) == y)] = factor(GraphFrame[,which(colnames(GraphFrame) == y)],levels=unique(GraphFrame[,which(colnames(GraphFrame) == y)],order=T))  #this is super important as it makes sure the order on the axis is correct!
     GraphFrame$Correlation <- gsub(".pVal", "",GraphFrame$Correlation, fixed = TRUE)
     z <- list(GraphFrame = GraphFrame, y = y, x = x)
     return(z)
   })
-
+  
   output$download_plot_data <- downloadHandler(
     filename = function() {paste(values$project_name, "_", "correlations_data.csv")},
     content = function(file) {
       write.csv(correlation.data()$GraphFrame, file, row.names = FALSE)
     }
   )
-
+  
   height <- function(){
     input$PlotHeight3
   }
-
+  
   width <- function(){
     input$PlotWidth3
   }
-
+  
   plotresolution.corr1 <- reactive({
     input$PlotRes3
   })
-
-
+  
+  
   correlations_makePlot <- reactive({
     y <- correlation.data()$y
     x <- correlation.data()$x
@@ -4276,7 +4292,7 @@ output$Module_Select <- renderUI({
     p[p < .0001] <- .0001 #set log-10 transformed p-values <4 (=0.0001) to 4
     p[p > .1] <- .1
     RV <- ifelse(GraphFrame$rVal>0,GraphFrame$rVal^4,(GraphFrame$rVal^4)*-1)
-
+    
     if(length(p)/length(unique(GraphFrame$Correlation)) <= 260){
       if(input$Alpha2 > .05 & input$Alpha2 <= .075){
         graph <- ggplot(data = GraphFrame, aes(Correlation, GraphFrame[,1],colour=RV, size = p), environment = environment()) + labs(y = y, x = x)  + 
@@ -4342,11 +4358,11 @@ output$Module_Select <- renderUI({
     }
     return(graph)
   })
-
+  
   output$correlations_plot <- renderPlot({
     correlations_makePlot()
   }, height = height, width = width)
-
+  
   output$download_corr_plot <- downloadHandler(
     filename = function() {paste(values$project_name, "_","significant_correlations_plot.png")},
     content = function(file){
@@ -4355,7 +4371,7 @@ output$Module_Select <- renderUI({
       dev.off()
     }
   )
-
+  
   output$Visit3 <- renderUI({
     correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     visit.name = colnames(correlations)[3]
@@ -4363,8 +4379,8 @@ output$Module_Select <- renderUI({
     visit <- gtools::mixedsort(as.character(visit))
     selectInput("visit3", paste("Correlations by"," ",visit.name, ":", sep = ""), choices = visit, selected = visit[1])
   })
-
-
+  
+  
   scatter_plot <- reactive({
     correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     correlation_file <- values$correlation_files[[which(values$correlation_names == input$TypeVariable7)]]
@@ -4373,28 +4389,28 @@ output$Module_Select <- renderUI({
     z <- list(x = x, y = y)
     return(z)
   })
-
+  
   scatter_width <- function(){
     input$PlotWidth5
   }
-
+  
   scatter_height <- function(){
     input$PlotHeight5
   }
-
+  
   plot_res5 <- reactive({
     input$PlotRes5
   })
-
-
+  
+  
   axis_text_size <- reactive({
     input$axis_text_size
   })
-
+  
   axis_label_size <- reactive({
     input$axis_label_size
   })
-
+  
   scatter_makePlot <- reactive({
     correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     if(input$log_scale == TRUE){
@@ -4408,7 +4424,7 @@ output$Module_Select <- renderUI({
     scat.plot <-  ggplot(data = dat, aes(x = x, y = y)) + geom_point(size = input$Point_size) + theme_bw()+
       labs(x = paste(input$WithVariable5, colnames(correlations)[3], input$visit3, sep = " "), y = paste(input$corr_Variable2, colnames(correlations)[3], input$visit3, sep = " ")) +
       theme(axis.text = element_text(size = axis_text_size()), axis.title = element_text(size = axis_label_size()))
-
+    
     if(input$plot_reg == TRUE){
       scat.plot <- scat.plot + geom_smooth(method = "lm", se = FALSE)
     }
@@ -4421,18 +4437,18 @@ output$Module_Select <- renderUI({
       }
     }
     grob <- grid::grobTree(textGrob(paste("Pearson r = ", round(pearson.r, 4),"\n P-Value = ", round(p.val, 4), sep = ""), x = .99, y=.965, just=1,
-                              gp=gpar(col="blue", fontsize=14)))
+                                    gp=gpar(col="blue", fontsize=14)))
     scat.plot <- scat.plot + annotation_custom(grob)
     z <- list(scatplot = scat.plot, dat = dat)
     return(z)
   })
-
-
+  
+  
   output$correlations_scatter_plot <- renderPlot({
     scatter_makePlot()$scatplot
   }, width = scatter_width, height = scatter_height)
-
-
+  
+  
   output$download_scatter_data <- downloadHandler(
     filename = function() {correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     paste(values$project_name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,"_data.csv")},
@@ -4442,7 +4458,7 @@ output$Module_Select <- renderUI({
       write.csv(dat, file, row.names = FALSE)
     }
   )
-
+  
   output$download_scatter <- downloadHandler(
     filename = function() {correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
     paste(values$project_name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,".png")},
@@ -4453,6 +4469,6 @@ output$Module_Select <- renderUI({
     }
   )
   
-################End of Correlations Part###################
+  ################End of Correlations Part###################
 
   })

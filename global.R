@@ -1,10 +1,3 @@
-#library(ggplot2)
-#library(fastcluster)
-#library(qusage)
-#library(NMF)
-#library(pca3d)
-#library(shinyjs)
-
 enableBookmarking(store = "server")
 load("moduleinfo.rda")
 load("moduleinfo_rna.rda")
@@ -916,7 +909,8 @@ uploadVarsRowCluster <- function(input, output, session, data, dendro){
   if(input$uploadVars){
     varnames <- read.csv(input$varSelect$datapath, header = TRUE)
     labelRows <- NULL
-    x <- data()[which(rownames(data()) %in% varnames[,1]),]
+    #x <- data()[which(rownames(data()) %in% varnames[,1]),]
+    x <- data()[match(varnames[,1], rownames(data()), nomatch = 0),]
     if(input$rowCluster){
       dist <- dist(x)
       hcl <- fastcluster::hclust(dist)

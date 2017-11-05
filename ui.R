@@ -1,8 +1,23 @@
 #User Interface for PALO FILTER Script!
 #options(shiny.deprecation.messages = FALSE)
-#require(shiny)
+require(shiny)
 #library(rmarkdown)
+#library(RColorBrewer)
+#library(fastcluster)
+#library(NMF)
+#library(grid)
+#library(clValid)
+#library(qusage)
+#library(VennDiagram)
+#library(gtools)
+#library(scales)
+#library(reshape2)
+#library(data.table)
+#library(pca3d)
+#library(shinyjs)
+#library(stringr)
 library(shinydashboard)
+library(ggplot2)
 
 function(request){
 

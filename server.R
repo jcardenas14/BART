@@ -1,22 +1,3 @@
-#require(shiny)
-#library(ggplot2)
-#library(RColorBrewer)
-#library(fastcluster)
-#library(NMF)
-#library(grid)
-#library(clValid)
-#library(qusage)
-#library(VennDiagram)
-#library(shinydashboard)
-#library(gtools)
-#library(scales)
-#library(reshape2)
-#library(data.table)
-#library(pca3d)
-#library(shinyjs)
-#library(stringr)
-library(ggplot2)
-
 tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
   box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
       uiOutput("Comparison1"),
@@ -920,9 +901,28 @@ output$Unsupervised <- renderMenu({
   output$downloadModMap3Other <- downloadHandler(
     filename = function() {paste(values$project_name,'_Longitudinal_ModuleMapData','.csv', sep='')  },
     content = function(file) {
-      write.csv(heatDataDownload(), file, row.names = TRUE)
+      write.csv(modDataDownload(), file, row.names = TRUE)
     }
   )
+  
+  modDataDownload <- reactive({
+    x <- modOrderedData()$x
+    if(is.na(modRowCluster()$ddm)){
+      if(is.na(modClusterData()$colddm)){
+        x <- x
+      } else {
+        x <- x[,order.dendrogram(modClusterData()$colddm)]
+      }
+    } else {
+      if(is.na(modClusterData()$colddm)){
+        x <- x[order.dendrogram(modRowCluster()$ddm),]
+      } else {
+        x <- x[order.dendrogram(modRowCluster()$ddm), order.dendrogram(modClusterData()$colddm)]
+        x <- x[nrow(x):1,]
+      }
+    }
+    return(x)
+  })
 
 
   output$modOptimalNumber <- renderText({
@@ -1476,7 +1476,9 @@ output$Unsupervised <- renderMenu({
       if(input$merge){
         x <- mergeDgeGeneSet()[!duplicated(mergeDgeGeneSet()[,2]),]
         colnames(x)[2] <- "PROBE_ID"
-        mergeData <- merge(y, x, by = "PROBE_ID", all.x = TRUE)[,-c(1:ncol(y)),drop = FALSE]
+        mergeData <- merge(y, x, by = "PROBE_ID", all.x = TRUE)[,-c(2:ncol(y)),drop = FALSE]
+        mergeData <- mergeData[match(y$PROBE_ID, mergeData$PROBE_ID, nomatch = 0),]
+        mergeData$PROBE_ID <- NULL
         y <- cbind(y[,c(1,2)],mergeData, y[,c(3:ncol(y))])
       }
     }

@@ -879,7 +879,7 @@ output$Unsupervised <- renderMenu({
                  detail = 'This may take a while...', value = 1,{
                    aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                              annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                             breaks=0)
+                             breaks = seq(-1,1,by=.04))
                  }
     )
   }, width = modWidth, height = modHeight)
@@ -893,7 +893,7 @@ output$Unsupervised <- renderMenu({
       png(file, width = (res/72)*width, height = (res/72)*height, res = res)
       print(aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                       annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                      breaks=0))
+                      breaks = seq(-1,1,by=.04)))
       dev.off()
     }
   )

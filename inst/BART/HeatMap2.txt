@@ -1,3 +1,4 @@
+library(NMF)
 aheatmap2 <- function (x, color = "-RdYlBu2:100", breaks = NA, border_color = NA, 
                        cellwidth = NA, cellheight = NA, circle_size = NA, annheight = 1, legendheight = 10000, scale = "none", Rowv = TRUE, 
                        Colv = TRUE, revC = identical(Colv, "Rowv") || is_NA(Rowv) || 

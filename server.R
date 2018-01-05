@@ -1762,9 +1762,9 @@ output$Unsupervised <- renderMenu({
       newsgl_Gene.Symbol <- sgl_flat()[which(sgl_flat()$Gene.Symbol %in% sss),][,-2]
       comparisons <- gsub("Estimate.", "", colnames(newsgl_Gene.Symbol)[grep("Estimate", colnames(newsgl_Gene.Symbol), fixed = TRUE)])
       dat <- reshape2::melt(newsgl_Gene.Symbol, id.vars = "Transcript.ID")
-      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, paste0(".",comparisons),2))
+      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, paste0(".",rep(comparisons,each = nrow(newsgl_Gene.Symbol))),2))
       colnames(splt) <- c("variable", "Comparison")
-      splt$Comparison <- comparisons
+      splt$Comparison <- rep(comparisons,each = nrow(newsgl_Gene.Symbol))
       dat <- do.call("cbind", list(Transcript.ID = as.character(dat[,1]), splt, value = dat$value))
       newdat <- reshape2::dcast(dat, Transcript.ID + Comparison ~ variable)
       newdat <- newdat[,c(1,2,4,7,6,5,3)]

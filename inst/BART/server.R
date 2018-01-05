@@ -212,6 +212,9 @@ shinyServer(function(input,output, session){
     values$rowdend1 <- NULL
     values$rowdend2 <- NULL
     values$rowdend3 <- NULL
+    values$norm.method <- "mean"
+    values$dist.method <- "euclidean"
+    values$agg.method <- "complete"
     values$time.var <- NULL
     values$control.var <- NULL
     values$control.val <- NULL
@@ -1727,7 +1730,7 @@ output$Unsupervised <- renderMenu({
     genlist <- gensymb.search()
     withProgress(message = '',
                  detail = 'Generating the Options...', value = 1,{
-                   selectizeInput("specgene", "Gene Gene.Symbol selection:",
+                   selectizeInput("specgene", "Gene.Symbol selection:",
                                   choices = genlist,
                                   selected = genlist[1],options = list(maxOptions = 30))
                  })
@@ -1737,7 +1740,7 @@ output$Unsupervised <- renderMenu({
     if(is.null(input$specgene)){return(NULL)}
     else{
       selectedprobes <- probe.search()
-      selectizeInput("probeid", "Probe ID selection:", multiple = TRUE, selectedprobes,selected=selectedprobes[1], options = list(maxOptions = 30))
+      selectizeInput("probeid", "Transcript.ID selection:", multiple = TRUE, selectedprobes,selected=selectedprobes[1], options = list(maxOptions = 30))
     }
   })
 
@@ -1748,8 +1751,6 @@ output$Unsupervised <- renderMenu({
   sgl_flat <- reactive({
     results.file <- values$results.file
     sgl <- results.file[grep("^P.Value", names(results.file))]
-    #sgl_1 <- apply(sgl, 2, p.adjust, method = "fdr")
-    #colnames(sgl_1) <- gsub("P.Value","FDR.P.Value",colnames(sgl_1))
     sgl_2 <- apply(sgl, 2, p.adjust, method = "bonferroni")
     colnames(sgl_2) <- gsub("P.Value.","Bonf.P.Value.",colnames(sgl_2))
     sgl_flat <- data.frame(results.file, sgl_2)
@@ -1761,9 +1762,9 @@ output$Unsupervised <- renderMenu({
       newsgl_Gene.Symbol <- sgl_flat()[which(sgl_flat()$Gene.Symbol %in% sss),][,-2]
       comparisons <- gsub("Estimate.", "", colnames(newsgl_Gene.Symbol)[grep("Estimate", colnames(newsgl_Gene.Symbol), fixed = TRUE)])
       dat <- reshape2::melt(newsgl_Gene.Symbol, id.vars = "Transcript.ID")
-      dat$variable <- gsub(".for.",".of.",dat$variable, fixed = TRUE)
-      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, ".of.",2))
+      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, paste0(".",rep(comparisons,each = nrow(newsgl_Gene.Symbol))),2))
       colnames(splt) <- c("variable", "Comparison")
+      splt$Comparison <- rep(comparisons,each = nrow(newsgl_Gene.Symbol))
       dat <- do.call("cbind", list(Transcript.ID = as.character(dat[,1]), splt, value = dat$value))
       newdat <- reshape2::dcast(dat, Transcript.ID + Comparison ~ variable)
       newdat <- newdat[,c(1,2,4,7,6,5,3)]
@@ -2788,8 +2789,8 @@ output$Module_Select <- renderUI({
   })
 
   FClist <- reactive({
-    fc_1 <- FlowMMR()[grep("^P.Value", names(FlowMMR()))]
-    fc_2 <- apply(fc_1, 2, p.adjust, method = "fdr")
+    fc_1 <- FlowMMR()[grep("^P.Value", colnames(FlowMMR()))]
+    fc_2 <- FlowMMR()[grep("^FDR.P.Value", colnames(FlowMMR()))]
     fc_3 <- apply(fc_1, 2, p.adjust, method = "bonferroni")
     sumfc <- function(alpha){
       Raw <- apply(fc_1, 2, function(x) sum(x[!is.na(x)] <= alpha))
@@ -2799,7 +2800,7 @@ output$Module_Select <- renderUI({
       return(sumfc)
     }
     x <- t(sumfc(input$alphaFlow_1))
-    y <- data.frame(Comparison = substring(rownames(x), 13), x)
+    y <- data.frame(Comparison = gsub("P.Value.","",rownames(x)), x)
     rownames(y) <- NULL
     y
   })
@@ -2816,9 +2817,10 @@ output$Module_Select <- renderUI({
   )
 
   output$CompF <- renderUI({
-    nam <- names(FlowMMR())
-    p.names <- substring(nam[grep("Estimate of ", nam, fixed = TRUE)], 13)
-    selectInput("compflow", "Comparison Selection:", p.names, p.names[1])
+    nam <- colnames(FlowMMR())
+    comp.names <- nam[grep("Estimate.", nam)]
+    comp.names <- gsub("Estimate.", "", comp.names)
+    selectInput("compflow", "Comparison Selection:", comp.names, comp.names[1])
   })
 
   output$flowlisttable <-renderDataTable({
@@ -2832,11 +2834,13 @@ output$Module_Select <- renderUI({
       write.csv(flowlist(), file, row.names = FALSE)
     }
   )
-
-  FlowData<-reactive({
+  
+  FlowData <- reactive({
     x <- values$flow.data
-    subsetindex<-which(x[,which(names(x) %in% values$f_responder_var)] %in% input$FlowSub)
-    x[subsetindex,]
+    if(input$FlowTransform){
+      x[,which(colnames(x) %in% FlowMMR()$Flow.variable)] <- log2(x[,which(colnames(x) %in% FlowMMR()$Flow.variable)]+1)
+    }
+    return(x)
   })
 
   FlowDataForDownload<-reactive({  if(input$FlowVarSet=="No Flow Data"){return(NULL)}
@@ -2855,132 +2859,111 @@ output$Module_Select <- renderUI({
     x[is.na(x)]<-1
     head(x)
   }, include.rownames = FALSE)
-
-  output$flowmax<-renderUI({ numericInput("FlowMax","Max value to be plotted for time:",max(FlowData()[,which(names(FlowData()) %in% time.var()$flow)]))  })
-  output$flowmin<-renderUI({ numericInput("FlowMin","Min value to be plotted for time:",min(FlowData()[,which(names(FlowData()) %in% time.var()$flow)]))  })
-  output$flowsub<-renderUI({
-    x <- values$flow.data
-    y<-unique(as.character(x[,which(names(x) %in% values$f_responder_var)]))
-    selectInput("FlowSub","Responder levels:",y,y[1:length(y)],multiple=TRUE)
+  
+  output$flowPlotGroup1<-renderUI({
+    x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+    groups <- colnames(x)
+    selectizeInput("flowPlotGroup1","Select grouping factor1:",groups, options = list(maxItems = 1), multiple=TRUE)
+  })
+  
+  output$flowPlotGroup1Vals <- renderUI({
+   x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+   vals <- unique(x[,input$flowPlotGroup1]) 
+   selectizeInput("flowPlotGroup1Vals", "Select grouping factor1 values:",vals,multiple = TRUE)
+  })
+  
+  output$flowPlotGroup2 <- renderUI({
+    x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+    groups <- colnames(x)
+    selectizeInput("flowPlotGroup2","Select grouping factor2:",groups, options = list(maxItems = 1), multiple=TRUE)
+  })
+  
+  output$flowPlotGroup2Vals <- renderUI({
+   x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+   vals <- unique(x[,input$flowPlotGroup2]) 
+   selectizeInput("flowPlotGroup2Vals", "Select grouping factor2 values:",vals,multiple = TRUE)
+  })
+  
+  output$flowTrackSubjects <- renderUI({
+    if(is.null(time.var()$flow) | is.null(input$flowPlotGroup1) | is.null(input$flowPlotGroup2) | is.null(subject.id()$flow)){return(NULL)}
+    if(input$flowPlotGroup2 == time.var()$flow){
+      return(
+       checkboxInput("flowTrackSubjects", "Track subjects over time ?", FALSE)
+      )
+    } else{
+      return(NULL)
+    }
   })
 
   flowplot <- reactive({
     if(length(input$FlowPlotVars) == 0){return(NULL)}
-    if(length(input$FlowSub) == 0){return(NULL)}
-    if(is.numeric(input$FlowMin) == FALSE & is.numeric(input$FlowMax) == FALSE){return(NULL)}
-    mysummary<-function(x){
-      y<-c(mean(x),sd(x),length(x))
-      names(y)<-c("Mean","Sd","N")
-      return(y)
-    }
-    
-    mydata <- sum1 <- summaries <- result <- myplot <- list()
-    for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      }
-      sum1[[i]] <- aggregate(FlowVar~responder+time, data=mydata[[i]], mysummary)
-      summaries[[i]] <- sum1[[i]][,3]
-      result[[i]] <- as.data.frame(cbind(sum1[[i]][,c(1,2)],summaries[[i]]))
-      names(result[[i]])<-c("ResponderStatus","Time",colnames(summaries[[i]]))
-      myplot[[i]] <- ggplot(data=result[[i]],aes(x=Time, y=Mean,group=ResponderStatus,colour=ResponderStatus))+geom_point()+geom_line(aes(size=.7))+
-        geom_errorbar(aes(ymin = Mean - 2*Sd, ymax = Mean + 2*Sd,size=.7)) +
-        scale_size(range=c(.1, 2),guide=FALSE)+ xlim(input$FlowMin, input$FlowMax)+ggtitle(input$FlowPlotVars[i])
-      if(input$FlowSamples){
-        myplot[[i]] <- myplot[[i]] + geom_point(data=mydata[[i]],aes(x=time,y=FlowVar,group=subjectid,colour=responder,size=1))+
-          geom_line(data=mydata[[i]],aes(x=time,y=FlowVar,group=subjectid,colour=responder,size=.25))
-      } 
-    }
-    z <- do.call(multiplot, c(myplot, cols = 2))
-    return(z)
-  })
-
-  flowplot2 <- reactive({
-    if(length(input$FlowPlotVars) == 0){return(NULL)}
     mydata <- dummy <- index <- myplot <- list()
     for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
+     mydata[[i]] <- select(FlowData(), c(input$FlowPlotVars[i], input$flowPlotGroup1, input$flowPlotGroup2, subject.id()$flow)) %>% mutate(Flow.variable = input$FlowPlotVars[i])
+     if(!is.null(input$flowPlotGroup1Vals)){
+      mydata[[i]] <- filter_at(mydata[[i]], .vars = input$flowPlotGroup1, any_vars(. %in% input$flowPlotGroup1Vals))
+     }
+     if(!is.null(input$flowPlotGroup2Vals)){
+      mydata[[i]] <-  filter_at(mydata[[i]], .vars = input$flowPlotGroup2, any_vars(. %in% input$flowPlotGroup2Vals))
+     }
+      if(is.null(input$flowPlotGroup1)){
+        if(input$flowbox){
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x = "Flow.variable", y=input$FlowPlotVars[i])) + geom_boxplot() + ggtitle(input$FlowPlotVars[i])
+        } else{
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x = "Flow.variable", y=input$FlowPlotVars[i])) + geom_point() + ggtitle(input$FlowPlotVars[i]) 
+        }
       } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
+        if(is.null(input$flowPlotGroup2)){
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup1])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup1]),]
+            mydata[[i]][,input$flowPlotGroup1] <- as.factor(mydata[[i]][,input$flowPlotGroup1])
+          }
+        if(input$flowbox){
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup1, y=input$FlowPlotVars[i], fill=input$flowPlotGroup1)) + geom_boxplot() + 
+           ggtitle(input$FlowPlotVars[i])
+        } else{
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup1, y=input$FlowPlotVars[i], colour=input$flowPlotGroup1)) + geom_point() + ggtitle(input$FlowPlotVars[i]) 
+        }
+        } else{
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup1])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup1]),]
+            mydata[[i]][,input$flowPlotGroup1] <- as.factor(mydata[[i]][,input$flowPlotGroup1])
+          }
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup2])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup2]),]
+            mydata[[i]][,input$flowPlotGroup2] <- as.factor(mydata[[i]][,input$flowPlotGroup2])
+          }
+          if(input$flowbox){
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i], fill=input$flowPlotGroup1)) + geom_boxplot() + 
+             ggtitle(input$FlowPlotVars[i])
+          } else{
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i], colour=input$flowPlotGroup1)) + geom_point() + 
+             ggtitle(input$FlowPlotVars[i]) 
+          }
+          if(time.var()$flow == input$flowPlotGroup2){
+           if(input$flowTrackSubjects){
+            subject.id <- subject.id()$flow
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i],group = subject.id,colour=input$flowPlotGroup1)) + 
+             geom_point() + geom_line(aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i],group=subject.id, colour = input$flowPlotGroup1)) +
+             ggtitle(input$FlowPlotVars[i])
+           }
+          }
+        }
       }
-      mydata[[i]] <- mydata[[i]][order(mydata[[i]]$time,mydata[[i]]$responder),]
-      mydata[[i]]$time<-factor(mydata[[i]]$time,ordered=T)
-      mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),ordered=T)
-      dummy[[i]] <- data.frame(do.call(rbind,strsplit(levels(mydata[[i]]$Time_Responder),"_")))
-      index[[i]] <- order(as.numeric(as.character(dummy[[i]]$X1)))
-      mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),levels(mydata[[i]]$Time_Responder)[index[[i]]])
-      if(input$flowbox){
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=FlowVar,fill=responder,colour=responder)) + geom_boxplot(position = position_dodge(width = .9)) + 
-          ggtitle(input$FlowPlotVars[i])
-      } else{
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=Time_Responder,y=FlowVar,fill=responder,colour=responder)) + geom_point() + 
-          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle(input$FlowPlotVars[i])
-      }
+      myplot[[i]] <- myplot[[i]] + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     }
-    z <- do.call(multiplot, c(myplot, cols = 2))
-    return(z)
+    plots <- do.call(multiplot, c(myplot, cols = 2))
+    return(plots)
   })
 
   output$FlowPlot<-renderPlot({
-    print(flowplot())
-  })
-
-  output$FlowPlot2<-renderPlot({
-    print(flowplot2())
-  })
-
-  FlowPlotSummary1<-reactive({
-    if(length(input$FlowPlotVars) == 0){return(NULL)}
-    if(length(input$FlowSub) == 0){return(NULL)}
-    mysummary<-function(x){
-      y<-c(mean(x),sd(x),length(x))
-      names(y)<-c("Mean","Sd","N")
-      return(y)
-    }
-    
-    mydata <- sum1 <- summaries <- result <- list()
-    FlowVariable <- c()
-    for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% time.var()$flow)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% subject.id()$flow)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      }
-      sum1[[i]] <- aggregate(FlowVar~responder+time, data=mydata[[i]], mysummary)
-      summaries[[i]] <- sum1[[i]][,3]
-      result[[i]] <- as.data.frame(cbind(sum1[[i]][,c(1,2)],summaries[[i]]))
-      names(result[[i]])<-c("ResponderStatus","Time",colnames(summaries[[i]]))
-      FlowVariable <- c(FlowVariable, rep(input$FlowPlotVars[i], length(result[[i]][,i])))
-    }
-    
-    z <- do.call(rbind, result)
-    z <- cbind(FlowVariable, z)
-    return(z)
+    flowplot()
   })
 
   output$FlowPlotSummary<-renderDataTable({
-    FlowPlotSummary1()
+   if(length(input$FlowPlotVars) == 0){return(NULL)}
+   results <- summarizeData(data = FlowData(), numeric.vars = input$FlowPlotVars, by = c(input$flowPlotGroup1, input$flowPlotGroup2))
+   return(results)
   })
 
   output$downloadFlowResults <- downloadHandler(
@@ -3009,15 +2992,6 @@ output$Module_Select <- renderUI({
     content = function(file){
       png(file, width = 900)
       print(flowplot())
-      dev.off()
-    }
-  )
-
-  output$downloadFlowPlot2 <- downloadHandler(
-    filename = function() {paste(values$project.name,'_','FlowPlot2','.png', sep = '')},
-    content = function(file){
-      png(file, width = 900)
-      print(flowplot2())
       dev.off()
     }
   )
@@ -3310,7 +3284,7 @@ output$Module_Select <- renderUI({
       index[[i]] <- order(as.numeric(as.character(dummy[[i]]$X1)))
       mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),levels(mydata[[i]]$Time_Responder)[index[[i]]])
       if(input$metabbox){
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=MetabVar,fill=responder,colour=responder)) + geom_boxplot(position = position_dodge(width = .9)) + 
+        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=MetabVar,fill=responder,colour=responder)) + geom_boxplot() + 
           ggtitle(input$MetabPlotVars[i])
       } else{
         myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=Time_Responder,y=MetabVar,fill=responder,colour=responder)) + geom_point() + 

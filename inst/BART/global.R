@@ -1,9 +1,4 @@
-#library(ggplot2)
-#library(fastcluster)
-#library(qusage)
-#library(NMF)
-#library(pca3d)
-#library(shinyjs)
+library(dplyr)
 
 enableBookmarking(store = "server")
 
@@ -217,6 +212,21 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
                                       layout.pos.col = matchidx$col))
     }
   }
+}
+
+summarizeData <- function(data, numeric.vars, by = NULL, data.type = "Flow.variable"){
+ df <- data
+ if(!is.null(by)){
+  df <- group_by_at(data, by)
+ }
+ df2 <- list()
+ for(i in 1:length(numeric.vars)){
+  df2[[i]] <- data.frame(summarise_at(df, .vars = c(numeric.vars[i]), .funs = funs(Mean = mean(.,na.rm=TRUE), Sd = sd(.,na.rm=TRUE), N = sum(!is.na(.)))))
+  df2[[i]] <- cbind(numeric.vars[i], df2[[i]])
+ }
+ results <- do.call(rbind, df2)
+ colnames(results)[1] <- data.type
+ return(results)
 }
 
 sum.custom <- function(x){

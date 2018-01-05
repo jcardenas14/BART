@@ -513,24 +513,30 @@ body <-  dashboardBody(
                                 fluidRow(
                                   box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
                                       uiOutput("FlowDataNames"),
-                                      uiOutput("flowsub"),               
+                                      uiOutput("flowPlotGroup1"),
+                                      uiOutput("flowPlotGroup1Vals"),
+                                      uiOutput("flowPlotGroup2"),
+                                      uiOutput("flowPlotGroup2Vals"),
+                                      uiOutput("flowTrackSubjects"),
                                       checkboxInput("FlowTransform","lg2 Transform",FALSE),
-                                      helpText("Options for 1st Plot:"),
-                                      uiOutput("flowmax"),
-                                      uiOutput("flowmin"),
-                                      checkboxInput("FlowSamples","Individual curves",FALSE),
-                                      helpText("Options for 2nd Plot:"),
                                       checkboxInput("flowbox","Box Plot View",FALSE),
+                                      checkboxInput("FlowSamples","Individual curves",FALSE),
                                       downloadButton('downloadFlowData', 'Download Data')
                                   ),
-                                  box(title = "Figures", width = 8, status = "primary", solidHeader = FALSE,
-                                      downloadButton('downloadFlowPlot', 'Download Figure'),
-                                      plotOutput("FlowPlot"),
-                                      downloadButton('downloadFlowPlot2', 'Download Figure'),
-                                      plotOutput("FlowPlot2"),
-                                      downloadButton('downloadFlowSummaries','Download Table'),
-                                      dataTableOutput("FlowPlotSummary")
-                                  )
+                                  column(width = 8,
+                                         fluidRow(
+                                           box(title = "Figure", width = 12, status = "primary", solidHeader = FALSE,
+                                               downloadButton('downloadFlowPlot', 'Download Figure'),
+                                               plotOutput("FlowPlot")
+                                           )
+                                         ),
+                                         fluidRow(
+                                           box(title = "Table", width = 12, status = "primary", solidHeader = FALSE,
+                                               downloadButton('downloadFlowSummaries','Download Table'),
+                                               dataTableOutput("FlowPlotSummary")
+                                           ) 
+                                         )
+                                  ) 
                                 )
                        )
                 )

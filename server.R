@@ -31,6 +31,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       )
   ),
   box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
+      uiOutput("baylorMods"),
       uiOutput('downloadModMap'),
       uiOutput('moduleMap'),
       helpText("Right click on hyperlinks to open in new window"),
@@ -242,13 +243,22 @@ shinyServer(function(input,output, session){
     values$corr.method <- NULL
     values$corrs <- NULL
     values$corr.files <- NULL
-    values$baylorMod <- FALSE
+    #values$baylorMod <- TRUE
     setwd(route)
     for (var in vars){
       values[[var]] <- get(var, .GlobalEnv)
     }
     return(values)
   }
+  
+  baylorMod <- reactive({
+   if(is.null(values$dge.gsets)){
+    baylorMod <- FALSE
+   } else{
+    baylorMod <- input$baylorMods
+   }
+   baylorMod
+  })
 
   observe({
     if(is.null(input$file1)) return(NULL)
@@ -320,10 +330,13 @@ shinyServer(function(input,output, session){
   })
   
   time.var <- reactive({
-    if(is.null(values$time.var)){return(NULL)}
-    id <- values$time.var[[which(names(values$time.var) %in% c("microarray", "rnaseq"))]]
-    flow <- values$time.var[[which(names(values$time.var) %in% c("flow"))]]
-    metab <- values$time.var[[which(names(values$time.var) %in% c("metab"))]]
+    if(is.null(values$time.var)){
+     id <- flow <- metab <- NULL
+    } else{
+     id <- values$time.var[[which(names(values$time.var) %in% c("microarray", "rnaseq"))]]
+     flow <- values$time.var[[which(names(values$time.var) %in% c("flow"))]]
+     metab <- values$time.var[[which(names(values$time.var) %in% c("metab"))]]
+    }
     z <- list(id = id, flow = flow, metab = metab)
     return(z)
   })
@@ -491,9 +504,15 @@ shinyServer(function(input,output, session){
     design <- design()$des
     time.var <- time.var()$id
     for(i in 1:ncol(design)){
-      if(is.factor(design[,i]) || colnames(design)[i] == time.var){
-        design[,i] <- as.character(design[,i])
+     if(is.null(time.var)){
+      if(is.factor(design[,i])){
+       design[,i] <- as.character(design[,i])
       }
+     } else{
+      if(is.factor(design[,i]) || colnames(design)[i] == time.var){
+       design[,i] <- as.character(design[,i])
+      }
+     }
       if(length(which(design[,i] == "")) > 0){
         design[,i][which(design[,i] == "")] <- NA
       }
@@ -532,7 +551,7 @@ shinyServer(function(input,output, session){
       sum0$Total <- as.character(sum0$Total)
     } else{
       mysummary<-function(x){
-        y<-summary(x)
+        y<-summary(x, na.rm = TRUE)
         y<-as.character(c(length(x),y))
         names(y)<-c("Total", names(summary(x)))
         return(y)
@@ -810,7 +829,7 @@ output$Unsupervised <- renderMenu({
   })
   
   output$modSelection <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     selectizeInput("moduleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
                                                               "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
   })
@@ -823,7 +842,7 @@ output$Unsupervised <- renderMenu({
     if(input$baseOrCtrl == "With Respect to Controls"){
       dat <- 100*(values$scores.ctrl-1)
     } 
-    if(values$baylorMod){
+    if(baylorMod()){
       if(input$moduleSelection == "First Round"){
         dat <- dat[1:2,]
       } else if(input$moduleSelection == "First Two Rounds"){
@@ -865,6 +884,11 @@ output$Unsupervised <- renderMenu({
     params <- list(width = width, height = height, fontSize = fontSize, legendSize = legendSize, treeHeight = treeHeight, resolution = resolution, 
                    circleSize = circleSize)
     return(params)
+  })
+  
+  modResolution <- reactive({
+   params <- callModule(graphOptions, "modGraphOptions", varType = "modules")
+   return(params$resolution)
   })
   
   modWidth <- function(){modGraphParams()$width}
@@ -1352,9 +1376,9 @@ output$Unsupervised <- renderMenu({
   })
 
   sig_ind <- reactive({
-    if(!is.null(values$modules)){
-      genes <- unlist(values$modules)
-      gsetNames <- rep(names(values$modules), times = lapply(values$modules, length))
+    if(!is.null(values$dge.gsets)){
+      genes <- unlist(values$dge.gsets)
+      gsetNames <- rep(names(values$dge.gsets), times = lapply(values$dge.gsets, length))
       modinfo <- data.frame(Module = gsetNames, Transcript.ID = genes)
       if(input$dgeResults == "Modular DGE Analysis"){
         dat <- callModule(filterOpts, "modDgeMap", data = reactive(values$results.file), data.type = "percents", geneList = reactive(modinfo))
@@ -1362,7 +1386,7 @@ output$Unsupervised <- renderMenu({
       if(input$dgeResults == "Gene Lists"){
         dat <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), data.type = "percents", geneList = reactive(modinfo))
       }
-      if(values$baylorMod == TRUE){
+      if(baylorMod() == TRUE){
         modnames <- unique(modinfo$Module)
         modnum<-gsub("M","",modnames)
         modvec<-as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
@@ -1371,8 +1395,10 @@ output$Unsupervised <- renderMenu({
         mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
         prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),]
         prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),]
+        z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
+      } else{
+        z <- list(prop_matrix = dat$prop_matrix, prop_matrix2 = dat$prop_matrix2)
       }
-      z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
       return(z)
     } else{
       return(NULL)
@@ -1422,12 +1448,12 @@ output$Unsupervised <- renderMenu({
   })
   
   output$moduleMap <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     plotOutput('modMap')
   })
   
   output$modmaplmmres <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     numericInput('modmaplmmres', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1)
   })
   
@@ -1435,8 +1461,13 @@ output$Unsupervised <- renderMenu({
     ModMap_Comparison()
   }, width = 700, height = 190)
   
+  output$baylorMods <- renderUI({
+   if(is.null(values$dge.gsets)){return(NULL)}
+   checkboxInput("baylorMods", strong("Are the provided gene sets baylor modules?"), FALSE)
+  })
+  
   output$downloadModMap <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     downloadButton('downloadModuleMap', "Download Figure")
   })
   
@@ -1492,30 +1523,34 @@ output$Unsupervised <- renderMenu({
   })
 
   output$test1<-renderUI({
-    if(is.null(values$rowdend3)){
-      if(ctrl()$id == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2)
-      }
-      if(ctrl()$id == FALSE){
-        try<-list("Baseline Mean Normalized" = 1)
-      }
+   if(is.null(values$rowdend3)){
+    if(ctrl()$id ==TRUE){
+     try<-list("All Samples Median Normalized" = 3,
+               "All Samples Healthy Normalized" = 4,
+               "Non-Healthy Samples Median Normalized" = 6)
     }
-    if(!is.null(values$rowdend3)){
-      if(ctrl()$id == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"=4,
-                  "All Samples Baseline Normalized"=5)
-      }
-      if(ctrl()$id == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
-      }
+    
+    if(ctrl()$id == FALSE){
+     try<-list("All Samples Median Normalized" = 3)
     }
-    selectInput("set1", "Select heatmap:",as.list(try))
+   }
+   
+   if(!is.null(values$rowdend3)){
+    if(ctrl()$id == TRUE){
+     try<-list("Baseline Mean Normalized" = 1,
+               "Baseline Healthy Normalized" = 2,
+               "All Samples Mean Normalized" = 3,
+               "All Samples Healthy Normalized"= 4,
+               "All Samples Baseline Normalized"=5)
+    }
+    
+    if(ctrl()$id == FALSE){
+     try<-list("Baseline Mean Normalized" = 1,
+               "All Samples Mean Normalized" = 3,
+               "All Samples Baseline Normalized"=5)
+    }
+   }
+   selectInput("set1", "Select heatmap:",as.list(try))
   })
 
 
@@ -1859,7 +1894,7 @@ output$Unsupervised <- renderMenu({
   modDgePlotHeight <- function(){modDgeGraphParams()$height}
   
   output$dgeModSelection <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
                                                               "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
   })
@@ -1871,7 +1906,7 @@ output$Unsupervised <- renderMenu({
     if(input$compSelect){
       dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0)]
     }
-    if(values$baylorMod){
+    if(baylorMod()){
       if(input$dgeModuleSelection == "First Round"){
         dat <- dat[1:2,]
       } else if(input$dgeModuleSelection == "First Two Rounds"){
@@ -2178,25 +2213,25 @@ output$Unsupervised <- renderMenu({
 ############## QUSAGE #####################
 
   output$qusage <- renderMenu({
-    if(is.null(values$qusage_results)){
+    if(is.null(values$qusage.results)){
       return(strong(""))
     }
-    if(is.null(values$qusage_results) == FALSE){
+    if(is.null(values$qusage.results) == FALSE){
       menuItem("Q-Gen", icon = icon("filter"), tabName = "qusage")
     }
   })
 
   output$genesets <- renderUI({
-    if(is.null(values$qusage_results)){
+    if(is.null(values$qusage.results)){
       return(NULL)
     }
     else{
-     if(is.list(values$qusage_results) & !is.data.frame(values$qusage_results)){
-       if(is.null(names(values$qusage_results))){
-         return(selectInput("genesets1", "Select geneset definition:", choices = c(1:length(values$qusage_results))))
+     if(is.list(values$qusage.results) & !is.data.frame(values$qusage.results)){
+       if(is.null(names(values$qusage.results))){
+         return(selectInput("genesets1", "Select geneset definition:", choices = c(1:length(values$qusage.results))))
        }
-       if(!is.null(names(values$qusage_results))){
-         return(selectInput("genesets1", "Select geneset definition:", choices = c(names(values$qusage_results))))
+       if(!is.null(names(values$qusage.results))){
+         return(selectInput("genesets1", "Select geneset definition:", choices = c(names(values$qusage.results))))
        }
      }
       else{
@@ -2206,16 +2241,16 @@ output$Unsupervised <- renderMenu({
   })
 
   master <- reactive({
-    if(is.null(values$qusage_results)){return(NULL)}
+    if(is.null(values$qusage.results)){return(NULL)}
     if(is.null(input$genesets1)){
-      qusage_results <- values$qusage_results
+      qusage_results <- values$qusage.results
     }
     if(!is.null(input$genesets1)){
-      if(!is.null(names(values$qusage_results))){
-        qusage_results <- values$qusage_results[[input$genesets1]]
+      if(!is.null(names(values$qusage.results))){
+        qusage_results <- values$qusage.results[[input$genesets1]]
       }
       else{
-        qusage_results <- values$qusage_results[[as.numeric(input$genesets1)]]
+        qusage_results <- values$qusage.results[[as.numeric(input$genesets1)]]
       }
     }
     master <- qusage_results
@@ -2241,29 +2276,30 @@ output$Unsupervised <- renderMenu({
     for(i in 1:n2){
       master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$dge.annots[,2][i])
     }
+    master$Comparison <- as.factor(master$Comparison)
     return(master)
   })
 
   mod_list <- reactive({
-    Modulelist <- values$gene_sets
+    Modulelist <- values$gene.sets
     return(Modulelist)
   })
 
 
   output$Comparisons <- renderUI({
-    selectInput("set_comp", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Comparisons1 <- renderUI({
-    selectInput("set_comp1", "Comparison(s) selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1], multiple = T)
+    selectInput("set_comp1", "Comparison(s) selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1], multiple = T)
   })
 
   output$Comparisons2 <- renderUI({
-    selectInput("set_comp2", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp2", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Comparisons3 <- renderUI({
-    selectInput("set_comp3", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp3", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Module_Select1 <- renderUI({
@@ -2408,8 +2444,8 @@ output$Module_Select <- renderUI({
   individual_modselect <- reactive({
     if(is.null(master())){return(NULL)}
     master = master()[which(master()$Comparison == input$set_comp2 & master()$pathway.name == input$Mod_Select), ,drop = F]
-    lowerCI = values$lowerCI
-    upperCI = values$upperCI
+    lowerCI = values$lower.ci
+    upperCI = values$upper.ci
     rownames(lowerCI) <- rownames(upperCI) <- as.character(values$results.file[,1])
     mmr_modselection <- callModule(filterOpts, "qusIndFcPlot", data = reactive(values$results.file), comparison = reactive(input$set_comp2), data.type = "genes")
     mmr_modselection <- mmr_modselection[which(mmr_modselection[,1] %in% mod_list()[[input$Mod_Select]]),]

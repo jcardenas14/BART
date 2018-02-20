@@ -267,9 +267,11 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
   results <- data()
   if(data.type %in% c("genes", "flow", "metab")){
     if(data.type == "genes"){
-      results <- results[,c(1,2,grep(comparison(), colnames(results), fixed = TRUE))]
+      results <- results[,c(1,2,which(colnames(results) %in% paste0("Estimate.", comparison()) | colnames(results) %in% paste0("Test.statistic.", comparison()) | 
+                                      colnames(results) %in% paste0("P.Value.", comparison()) | colnames(results) %in% paste0("FDR.P.Value.", comparison())))]
     } else{
-      results <- results[,c(1,grep(comparison(), colnames(results), fixed = TRUE))]
+      results <- results[,c(1,2,which(colnames(results) %in% paste0("Estimate.", comparison()) | colnames(results) %in% paste0("Test.statistic.", comparison()) | 
+                                       colnames(results) %in% paste0("P.Value.", comparison()) | colnames(results) %in% paste0("FDR.P.Value.", comparison())))]
     }
     #fdr <- p.adjust(results[,5], method = "fdr")
     #fdr <- results[,6]

@@ -89,6 +89,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       helpText(""),
       downloadButton('downloadHeatmap1', 'Download Data'),
       downloadButton('downloadHeatmap2', 'Download Figure'),
+      checkboxInput("plotGeneSymbols", strong("Plot Gene Symbols?"), FALSE),
       plotOutput("heatmap1")
   )
   )), list(Title = "Venn Diagram", Content =  fluidRow(
@@ -257,6 +258,11 @@ shinyServer(function(input,output, session){
    } else{
     baylorMod <- input$baylorMods
    }
+   baylorMod
+  })
+  
+  unsupervisedBaylorMod <- reactive({
+   baylorMod <- input$baylorModules
    baylorMod
   })
 
@@ -809,6 +815,10 @@ output$Unsupervised <- renderMenu({
 
   #################################### Module Maps ############################
   
+  output$baylorModules <- renderUI({
+   checkboxInput("baylorModules", strong("Are plotted scores from Baylor modules?"), FALSE)
+  })
+  
   output$baseOrCtrl <- renderUI({
     if(is.null(values$scores.ctrl) & is.null(values$scores.base)){return(NULL)}
     if(!is.null(values$scores.ctrl) & !is.null(values$scores.base)){
@@ -829,7 +839,7 @@ output$Unsupervised <- renderMenu({
   })
   
   output$modSelection <- renderUI({
-    if(!baylorMod()){return(NULL)}
+    if(!unsupervisedBaylorMod()){return(NULL)}
     selectizeInput("moduleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
                                                               "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
   })
@@ -842,7 +852,7 @@ output$Unsupervised <- renderMenu({
     if(input$baseOrCtrl == "With Respect to Controls"){
       dat <- 100*(values$scores.ctrl-1)
     } 
-    if(baylorMod()){
+    if(unsupervisedBaylorMod()){
       if(input$moduleSelection == "First Round"){
         dat <- dat[1:2,]
       } else if(input$moduleSelection == "First Two Rounds"){
@@ -1517,8 +1527,20 @@ output$Unsupervised <- renderMenu({
 
   sig_exp_file <- reactive({
     g <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparison2),"genes")
-    g <- values$exprs[which(rownames(values$exprs) %in% g$Transcript.ID),]
-    z = list(g = g)
+    e <- values$exprs[match(g$Transcript.ID, rownames(values$exprs), nomatch = 0),]
+    g <- g[match(rownames(e), g$Transcript.ID, nomatch = 0),]
+    g$Gene.Symbol <- as.character(g$Gene.Symbol)
+    g$Transcript.ID <- as.character(g$Transcript.ID)
+    if(length(which(g$Gene.Symbol == "")) > 0){
+     rows <- g$Gene.Symbol
+     rows[which(rows == "")] <- g$Transcript.ID[which(rows == "")]
+    } else{
+     rows <- g$Gene.Symbol
+    }
+    if(input$plotGeneSymbols){
+     rownames(e) <- make.unique(as.character(rows))
+    }
+    z = list(g = e)
     return(z)
   })
 

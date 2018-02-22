@@ -264,6 +264,7 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Heatmap Options", width = 4, status = "primary", solidHeader = FALSE,
                                     div(style = "display:inline-block", actionButton("goMod", "Plot")),
+                                    uiOutput("baylorModules"),
                                     uiOutput("baseOrCtrl"),
                                     uiOutput("modSelection"),
                                     uploadVarsUI("mod", varType = "modules"),

@@ -1287,10 +1287,10 @@ output$Unsupervised <- renderMenu({
 
   siglist <- reactive({
     results.file <- values$results.file
-    estimates <- results.file[,grep("Estimate", names(results.file))]
-    pvals <- results.file[,grep("^P.Value", names(results.file))]
+    estimates <- results.file[,grep("Estimate", names(results.file)), drop = FALSE]
+    pvals <- results.file[,grep("^P.Value", names(results.file)), drop = FALSE]
     #fdr.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "fdr"))
-    fdr.pvals <- results.file[,grep("FDR.P.Value", names(results.file))]
+    fdr.pvals <- results.file[,grep("FDR.P.Value", names(results.file)), drop = FALSE]
     #colnames(fdr.pvals) <- gsub("P.Value","FDR.P.Value",colnames(fdr.pvals))
     bonf.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "bonferroni"))
     colnames(bonf.pvals) <- gsub("P.Value.","Bonf.P.Value.",colnames(bonf.pvals))
@@ -1413,8 +1413,8 @@ output$Unsupervised <- renderMenu({
         modmat<-matrix(modvec,ncol=2,byrow=T)
         modordnum<-table(factor(modinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
         mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
-        prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),]
-        prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),]
+        prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),,drop = FALSE]
+        prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),,drop = FALSE]
         z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
       } else{
         z <- list(prop_matrix = dat$prop_matrix, prop_matrix2 = dat$prop_matrix2)
@@ -1951,36 +1951,36 @@ output$Unsupervised <- renderMenu({
     ddm <- NA
     colddm <- NA
     if(input$compSelect){
-      dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0)]
+      dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0), drop = FALSE]
     }
     if(baylorMod()){
-      if(input$dgeModuleSelection == "Only Annotated"){
-        dat <- dat[grep(" ", rownames(dat)), ]
-      } else if(input$dgeModuleSelection == "First Round"){
-        #dat <- dat[1:2,]
-        dat <- dat[grep("^M1", rownames(dat)),]
-      } else if(input$dgeModuleSelection == "First Two Rounds"){
-        #dat <- dat[1:5,]
-        dat <- dat[grep("^M1|^M2", rownames(dat)),] 
-      } else if(input$dgeModuleSelection == "First Three Rounds"){
-        #dat <- dat[1:11,]
-        dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),] 
-      } else if(input$dgeModuleSelection == "First Four Rounds"){
-        #dat <- dat[1:27,]
-        dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),]
-      } else if(input$dgeModuleSelection == "First Five Rounds"){
-        #dat <- dat[1:42,]
-        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),]
-      } else if(input$dgeModuleSelection == "First Six Rounds"){
-        #dat <- dat[1:62,]
-        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),]
-      } else if(input$dgeModuleSelection == "First Seven Rounds"){
-        #dat <- dat[1:97,]
-        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),]
-      } else if(input$dgeModuleSelection == "First Eight Rounds"){
-        #dat <- dat[1:208,]
-        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),]
-      } 
+     if(input$dgeModuleSelection == "Only Annotated"){
+      dat <- dat[grep(" ", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Round"){
+      #dat <- dat[1:2,]
+      dat <- dat[grep("^M1", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Two Rounds"){
+      #dat <- dat[1:5,]
+      dat <- dat[grep("^M1|^M2", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Three Rounds"){
+      #dat <- dat[1:11,]
+      dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Four Rounds"){
+      #dat <- dat[1:27,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Five Rounds"){
+      #dat <- dat[1:42,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Six Rounds"){
+      #dat <- dat[1:62,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Seven Rounds"){
+      #dat <- dat[1:97,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Eight Rounds"){
+      #dat <- dat[1:208,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),, drop = FALSE]
+     } 
     }
     if(input$uploadModules){
       modNames <- read.csv(input$modSelect$datapath, header = TRUE)
@@ -2314,7 +2314,7 @@ output$Unsupervised <- renderMenu({
     colnames(master)[which(colnames(master) == "log.fold.change")] <- "Log2FC"
     unique_comp <- unique(master$Comparison)
     sub_uniquecomp <- list()
-    n = length(unique_comp)
+    n <- length(unique_comp)
     for(i in 1:n){
       sub_uniquecomp[[i]] <- which(master$Comparison == unique_comp[i])
     }
@@ -2324,14 +2324,16 @@ output$Unsupervised <- renderMenu({
     }
     bonf <- unlist(bonf)
     master$Bonf <- bonf
-    n2 <- length(values$dge.annots[,1])
-    mod.ann <- list()
-    master$Modulev2_Annotation <- ""
-    for(i in 1:n2){
-      mod.ann[[i]] <- which(master$pathway.name %in% values$dge.annots[,1][i])
-    }
-    for(i in 1:n2){
-      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$dge.annots[,2][i])
+    if(!is.null(values$annots)){
+     n2 <- length(values$annots[,1])
+     mod.ann <- list()
+     master$Modulev2_Annotation <- ""
+     for(i in 1:n2){
+      mod.ann[[i]] <- which(master$pathway.name %in% values$annots[,1][i])
+     }
+     for(i in 1:n2){
+      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$annots[,2][i])
+     }
     }
     master$Comparison <- as.factor(master$Comparison)
     return(master)
@@ -2434,7 +2436,7 @@ output$Module_Select <- renderUI({
       master3 = master3[which(master3$Log2FC < 0),]
     }
     if(nrow(master1) > 0){
-      master_sig1 = aggregate(Comparison ~ Comparison, data = master1, FUN = table)
+      master_sig1 = aggregate(Comparison ~ Comparison, data = master1, FUN = table, drop = FALSE)
       master_sig1 = as.matrix(master_sig1)
       master_sig1 = as.data.frame(master_sig1)
       colnames(master_sig1) = sub("Comparison.", "",colnames(master_sig1))
@@ -2494,6 +2496,9 @@ output$Module_Select <- renderUI({
       master_sig[,4] = as.numeric(as.character(master_sig[,4]))
       colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
       master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
+    }
+    if(nrow(master_sig) == 1){
+     master_sig$Comparison <- unique(master()$Comparison)
     }
     return(master_sig)
   })
@@ -2755,7 +2760,7 @@ output$Module_Select <- renderUI({
 
   output$MultipleCompTab <- renderDataTable({
     if(is.null(master())){return(NULL)}
-    if(!is.null(values$dge.annots)){
+    if(!is.null(values$annots)){
       if(input$only_annotated){
         comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
       } else{

@@ -377,11 +377,11 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
     nam <- colnames(dataset)
     index <- grep("^P.Value",nam)
     p.names <- gsub("P.Value.","",nam[index])
-    y <- as.matrix(dataset[,index])
+    y <- as.matrix(dataset[,index, drop = FALSE])
     if(input$correction_method == "Raw"){
       dat<-y
     } else if(input$correction_method == "FDR"){
-      dat<-as.matrix(dataset[,grep("FDR.P.Value", colnames(dataset))])
+      dat<-as.matrix(dataset[,grep("FDR.P.Value", colnames(dataset)), drop = FALSE])
     } else if(input$correction_method == "Bonferroni"){
       dat<-apply(y,2,p.adjust,method="bonferroni")
     }
@@ -390,7 +390,7 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
     dat[dat == 2] <- 1
     
     fcindex <- grep("Estimate",colnames(dataset),fixed=T)
-    dataset.fcindex <- dataset[,fcindex]
+    dataset.fcindex <- dataset[,fcindex, drop = FALSE]
     if(input$showfc == TRUE){
       dataset.fcindex[dataset.fcindex < input$fcval & dataset.fcindex > -input$fcval] <- 0
       sign.dat <- sign(dataset.fcindex)

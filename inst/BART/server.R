@@ -840,7 +840,7 @@ output$Unsupervised <- renderMenu({
   
   output$modSelection <- renderUI({
     if(!unsupervisedBaylorMod()){return(NULL)}
-    selectizeInput("moduleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+    selectizeInput("moduleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
                                                               "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
   })
   
@@ -853,22 +853,32 @@ output$Unsupervised <- renderMenu({
       dat <- 100*(values$scores.ctrl-1)
     } 
     if(unsupervisedBaylorMod()){
-      if(input$moduleSelection == "First Round"){
-        dat <- dat[1:2,]
+      if(input$moduleSelection == "Only Annotated"){
+        dat <- dat[grep(" ", rownames(dat)),]
+      } else if(input$moduleSelection == "First Round"){
+        #dat <- dat[1:2,]
+        dat <- dat[grep("^M1", rownames(dat)),]
       } else if(input$moduleSelection == "First Two Rounds"){
-        dat <- dat[1:5,]
+        #dat <- dat[1:5,]
+        dat <- dat[grep("^M1|^M2", rownames(dat)),]
       } else if(input$moduleSelection == "First Three Rounds"){
-        dat <- dat[1:11,]
+        #dat <- dat[1:11,]
+        dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),]
       } else if(input$moduleSelection == "First Four Rounds"){
-        dat <- dat[1:27,]
+        #dat <- dat[1:27,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),]
       } else if(input$moduleSelection == "First Five Rounds"){
-        dat <- dat[1:42,]
+        #dat <- dat[1:42,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),]
       } else if(input$moduleSelection == "First Six Rounds"){
-        dat <- dat[1:62,]
+        #dat <- dat[1:62,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),]
       } else if(input$moduleSelection == "First Seven Rounds"){
-        dat <- dat[1:97,]
+        #dat <- dat[1:97,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),]
       } else if(input$moduleSelection == "First Eight Rounds"){
-        dat <- dat[1:208,]
+        #dat <- dat[1:208,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),]
       } 
     }
     des <- design()$des
@@ -1917,34 +1927,59 @@ output$Unsupervised <- renderMenu({
   
   output$dgeModSelection <- renderUI({
     if(!baylorMod()){return(NULL)}
-    selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
-                                                              "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+    if(!is.null(values$dge.annots)){
+     return(
+      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+     )
+    } else{
+     return(
+      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+     )
+    }
   })
   
   modDgeData <- eventReactive(input$goModDge,{
     dat <- sig_ind()$prop_matrix2*100
+    if(!is.null(values$dge.annots)){
+     annots <- values$dge.annots[match(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], 
+                                       as.character(values$dge.annots[,1]), nomatch = 0),]
+     rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))] <- 
+      paste0(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], " ", as.character(annots[,2]))
+    }
     ddm <- NA
     colddm <- NA
     if(input$compSelect){
       dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0)]
     }
     if(baylorMod()){
-      if(input$dgeModuleSelection == "First Round"){
-        dat <- dat[1:2,]
+      if(input$dgeModuleSelection == "Only Annotated"){
+        dat <- dat[grep(" ", rownames(dat)), ]
+      } else if(input$dgeModuleSelection == "First Round"){
+        #dat <- dat[1:2,]
+        dat <- dat[grep("^M1", rownames(dat)),]
       } else if(input$dgeModuleSelection == "First Two Rounds"){
-        dat <- dat[1:5,]
+        #dat <- dat[1:5,]
+        dat <- dat[grep("^M1|^M2", rownames(dat)),] 
       } else if(input$dgeModuleSelection == "First Three Rounds"){
-        dat <- dat[1:11,]
+        #dat <- dat[1:11,]
+        dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),] 
       } else if(input$dgeModuleSelection == "First Four Rounds"){
-        dat <- dat[1:27,]
+        #dat <- dat[1:27,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),]
       } else if(input$dgeModuleSelection == "First Five Rounds"){
-        dat <- dat[1:42,]
+        #dat <- dat[1:42,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),]
       } else if(input$dgeModuleSelection == "First Six Rounds"){
-        dat <- dat[1:62,]
+        #dat <- dat[1:62,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),]
       } else if(input$dgeModuleSelection == "First Seven Rounds"){
-        dat <- dat[1:97,]
+        #dat <- dat[1:97,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),]
       } else if(input$dgeModuleSelection == "First Eight Rounds"){
-        dat <- dat[1:208,]
+        #dat <- dat[1:208,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),]
       } 
     }
     if(input$uploadModules){

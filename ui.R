@@ -206,6 +206,7 @@ body <-  dashboardBody(
                                     textOutput('OptimalNumber'),
                                     downloadButton('downloadHeatmapData', 'Download Data'),
                                     downloadButton("downloadHeatmap", "Download Figure"),
+                                    uiOutput("plotGeneSymbols"),
                                     helpText(""),
                                     plotOutput('heatmap')
                                 )

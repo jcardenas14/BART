@@ -89,7 +89,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       helpText(""),
       downloadButton('downloadHeatmap1', 'Download Data'),
       downloadButton('downloadHeatmap2', 'Download Figure'),
-      checkboxInput("plotGeneSymbols", strong("Plot Gene Symbols?"), FALSE),
+      checkboxInput("dgePlotGeneSymbols", strong("Plot Gene Symbols?"), FALSE),
       plotOutput("heatmap1")
   )
   )), list(Title = "Venn Diagram", Content =  fluidRow(
@@ -957,6 +957,7 @@ output$Unsupervised <- renderMenu({
                    aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                              annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
                              breaks=seq(-100,100,by=4))
+                   
                  }
     )
   }, width = modWidth, height = modHeight)
@@ -1091,6 +1092,17 @@ output$Unsupervised <- renderMenu({
     z<-list(y=y,ddm=ddm)
     return(z)
   })
+  
+  output$plotGeneSymbols <- renderUI({
+   if(is.null(values$results.file)){return(NULL)}
+   if(all.equal(as.character(values$results.file$Transcript.ID), as.character(values$results.file$Gene.Symbol)) == TRUE){return(NULL)}
+   checkboxInput("plotGeneSymbols", "Plot Gene Symbols?", FALSE)
+  })
+  
+  output$dgePlotGeneSymbols <- renderUI({
+   if(all.equal(as.character(values$results.file$Transcript.ID), as.character(values$results.file$Gene.Symbol)) == TRUE){return(NULL)}
+   checkboxInput("dgePlotGeneSymbols", "Plot Gene Symbols?", FALSE)
+  })
 
   heatmapname<-reactive({
     if(input$set==1) heattxt<-"Baseline Median Normalized"
@@ -1124,11 +1136,12 @@ output$Unsupervised <- renderMenu({
   callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(design()$des))
   
   rowCluster <- eventReactive(input$go, {
-    dat<- callModule(uploadVarsRowCluster, "transcripts", data = reactive(heatmapdata()$y$exprs.norm), dendro = reactive(heatmapdata()$ddm))
+    dat <- callModule(uploadVarsRowCluster, "transcripts", data = reactive(heatmapdata()$y$exprs.norm), dendro = reactive(heatmapdata()$ddm))
     x <- dat$x
     ddm <- dat$ddm
     labelRows <- dat$labelRows
-    y <- list(x = x, ddm = ddm, labelRows = labelRows)
+    rowAnnot <- dat$rowAnnot
+    y <- list(x = x, ddm = ddm, labelRows = labelRows, rowAnnot = rowAnnot)
     return(y)
   })
   
@@ -1154,6 +1167,11 @@ output$Unsupervised <- renderMenu({
   
   maxRangeData <- eventReactive(input$go, {
     x <- callModule(maxValues, "unsupervisedMaxValues", reactive(orderedData()$x))
+    if(!is.null(values$results.file) & all.equal(values$results.file$Transcript.ID, values$results.file$Gene.Symbol) != TRUE){
+     if(input$plotGeneSymbols){
+      rownames(x) <- make.unique(as.character(values$results.file$Gene.Symbol[match(rownames(x), as.character(values$results.file$Transcript.ID))]))
+     }
+    }
     return(x)
   })
   
@@ -1167,7 +1185,7 @@ output$Unsupervised <- renderMenu({
                  detail = 'This may take a while...', value = 1,{
                    aheatmap2(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
                              annheight = graphParams()$legendSize,color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows,
-                             breaks=0)
+                             annRow = rowCluster()$rowAnnot,breaks=0)
                  }
     )
   }, width = plotWidth, height = plotHeight)
@@ -1377,9 +1395,9 @@ output$Unsupervised <- renderMenu({
   })
   
   sel_genelists <- reactive({
-    if(length(grep("All", input$comparisons_download, fixed = TRUE)) > 0){
+    if(length(grep("All", input$comparisons_download)) > 0){
       nam <- names(values$results.file)
-      index <- grep("^P.Value",nam,fixed=T)
+      index <- grep("^P.Value",nam)
       p.names <- nam[index]
       comps <- gsub("P.Value.", "", p.names)
     }
@@ -1547,7 +1565,7 @@ output$Unsupervised <- renderMenu({
     } else{
      rows <- g$Gene.Symbol
     }
-    if(input$plotGeneSymbols){
+    if(input$dgePlotGeneSymbols){
      rownames(e) <- make.unique(as.character(rows))
     }
     z = list(g = e)
@@ -1882,8 +1900,10 @@ output$Unsupervised <- renderMenu({
     content = function(file) {
       file.names <- c()
       for(i in 1:length(sel_genelists())){
-        file.names[i] <- paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = "")
-        write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = ""), row.names = FALSE)
+        #file.names[i] <- paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = "")
+        file.names[i] <- paste(names(sel_genelists())[i],".csv", sep = "")
+        #write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = ""), row.names = FALSE)
+        write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], ".csv", sep = ""), row.names = FALSE)
       }
       zip(zipfile = file, files = file.names)
     },
@@ -1985,6 +2005,9 @@ output$Unsupervised <- renderMenu({
     if(input$uploadModules){
       modNames <- read.csv(input$modSelect$datapath, header = TRUE)
       dat <- dat[which(rownames(dat) %in% modNames[,1]),]
+    }
+    if(input$LMMdeleterows){
+      dat <- dat[-which(rowSums(dat) == 0),]
     }
     if(input$modDgeCluster){
       ddm <- FALSE

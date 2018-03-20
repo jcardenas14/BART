@@ -538,7 +538,11 @@ subsetAndOrder <- function(input, output, session, des, data, sampleAnnot){
   }
   for(i in 1:ncol(colAnnot)){
     if(length(unique(colAnnot[,i])) > 10){
-      colAnnot[,i] <- as.numeric(as.factor(as.character(colAnnot[,i])))
+      if(is.numeric(colAnnot[,i])){
+        colAnnot[,i] <- colAnnot[,i]
+      } else{
+        colAnnot[,i] <- as.numeric(as.factor(as.character(colAnnot[,i])))
+      }
     }
   }
   return(list(dat = x.ord, colAnnot = colAnnot, design = design))
@@ -702,8 +706,13 @@ uploadVarsUI <- function(id, varType){
 uploadVarsRowCluster <- function(input, output, session, data, dendro){
   if(input$uploadVars){
     varnames <- read.csv(input$varSelect$datapath, header = TRUE)
+    rowAnnot <- NA
     labelRows <- NULL
     x <- data()[which(rownames(data()) %in% varnames[,1]),]
+    if(ncol(varnames) > 1){
+      rowAnnot <- varnames[,-1,drop = FALSE]
+      rowAnnot <- rowAnnot[match(rownames(x), varnames[,1], nomatch = 0),,drop = FALSE]
+    }
     if(input$rowCluster){
       dist <- dist(x)
       hcl <- fastcluster::hclust(dist)
@@ -717,10 +726,11 @@ uploadVarsRowCluster <- function(input, output, session, data, dendro){
   } else {
     x <- data()
     x <- x[order.dendrogram(dendro()),]
+    rowAnnot <- NA
     ddm <- NA
     labelRows = NA
   }
-  return(list(ddm = ddm, x = x, labelRows = labelRows))
+  return(list(ddm = ddm, x = x, labelRows = labelRows, rowAnnot = rowAnnot))
 }
 
 # Heatmap Graphing Options

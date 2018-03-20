@@ -365,7 +365,7 @@ shinyServer(function(input,output, session){
 
   output$versionbox <- renderValueBox({
     valueBox(
-      paste0("Software Version: BETA \nRelease Date: TBD"), version$version.string, icon = icon("th-list"),
+      paste0("Software Version: 1.0.0 \nRelease Date: TBD"), version$version.string, icon = icon("th-list"),
       color = "purple"
     )
   })

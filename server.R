@@ -1,22 +1,3 @@
-require(shiny)
-#library(ggplot2)
-#library(RColorBrewer)
-#library(fastcluster)
-#library(NMF)
-#library(grid)
-#library(clValid)
-#library(qusage)
-#library(VennDiagram)
-#library(shinydashboard)
-#library(gtools)
-#library(scales)
-#library(reshape2)
-#library(data.table)
-#library(pca3d)
-#library(shinyjs)
-#library(stringr)
-library(ggplot2)
-
 tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
   box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
       uiOutput("Comparison1"),
@@ -180,16 +161,21 @@ shinyServer(function(input,output, session){
     selectInput("set", "Select heatmap:",as.list(try))
   })
 
-  dir.projects <- reactive({
-    "C:/Users/e89628/Documents/Intern/BartDownloadFilesForTesting/BART"
-  })
-
   list.projects <- reactive({
-    list.files(dir.projects())
+    list.files("data")
   })
-
-  get.wd <- eventReactive(input$uploadserver,{return(getwd())})
-
+  
+  output$exampleData <- renderUI({
+   selectizeInput("exampleData", "Select example BART results file for Demo:", choices = list.projects(), multiple = TRUE, selected = NULL,
+                  options = list(maxItems = 1))
+  })
+  
+  output$uploadExampleData <- renderUI({
+   if(is.null(input$exampleData)){return(NULL)}
+   withBusyIndicatorUI(
+    actionButton("uploadExampleData", "Upload Demo BART file", class = "btn-primary", style = "color: white; background-color: #363f47")
+   )
+  })
 
   fileindex<-reactive({
     if(is.null(input$file1)){return(NULL)}
@@ -267,9 +253,16 @@ shinyServer(function(input,output, session){
   })
 
   observe({
-    if(is.null(input$file1)) return(NULL)
+   if(is.null(input$file1)) return(NULL)
     mypath<-input$file1[[fileindex()[3], 'datapath']]
     updateData(mypath, tempdir())
+  })
+  
+  observeEvent(input$uploadExampleData,{
+   withBusyIndicatorServer("uploadExampleData", {
+    mypath <- "data/Longitudinal TB Data/bartResults.rda"
+    updateData(mypath, tempdir())
+   })
   })
   
   design <- reactive({
@@ -371,7 +364,7 @@ shinyServer(function(input,output, session){
   })
 
   output$version <- renderPrint({
-    writeLines("Software Version: BETA \nRelease Date: TBD")
+    writeLines("Software Version: 1.0.0 \nRelease Date: TBD")
     writeLines(version$version.string)
   })
 

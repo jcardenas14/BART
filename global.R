@@ -1,8 +1,26 @@
+library(shiny)
+library(ggplot2)
+library(RColorBrewer)
+library(fastcluster)
+library(NMF)
+library(grid)
+library(clValid)
+library(VennDiagram)
+library(shinydashboard)
+library(gtools)
+library(scales)
+library(reshape2)
+library(data.table)
+library(pca3d)
+library(shinyjs)
+library(stringr)
 library(dplyr)
+library(shinydashboard)
 
 enableBookmarking(store = "server")
 
 source("HeatMap2.txt")
+source("helpers.R")
 helpPopup <- function(title, content,
                       placement=c('right', 'top', 'left', 'bottom'),
                       trigger=c('click', 'hover', 'focus', 'manual')) {

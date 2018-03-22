@@ -1,8 +1,5 @@
 #User Interface for PALO FILTER Script!
 #options(shiny.deprecation.messages = FALSE)
-#require(shiny)
-#library(rmarkdown)
-library(shinydashboard)
 
 function(request){
 
@@ -65,6 +62,9 @@ body <-  dashboardBody(
                   hr(),
                   fileInput('file1', 'Upload BART Files and any QC reports for the Project:', multiple = TRUE,
                             accept=c(".rda",".png",".html",".csv")),
+                  uiOutput('exampleData'),
+                  uiOutput('uploadExampleData'),
+                  br(),
                   bookmarkButton(),
                   tags$script('
                               Shiny.addCustomMessageHandler("resetFileInputHandler", function(x) {      

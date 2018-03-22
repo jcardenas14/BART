@@ -260,7 +260,7 @@ shinyServer(function(input,output, session){
   
   observeEvent(input$uploadExampleData,{
    withBusyIndicatorServer("uploadExampleData", {
-    mypath <- "data/Longitudinal TB Data/bartResults.rda"
+    mypath <- "data/Longitudinal Macaque TB Data/bartResults.rda"
     updateData(mypath, tempdir())
    })
   })

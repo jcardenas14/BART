@@ -593,15 +593,15 @@ shinyServer(function(input,output, session){
   
   output$summary0 <- renderUI({
     if(input$sortableTable){
-      return(DT::dataTableOutput("summaryTable"))
+      return(dataTableOutput("summaryTable"))
     } else{
       return(tableOutput("summaryTable2"))
     }
   })
   
-  output$summaryTable <- DT::renderDataTable({
+  output$summaryTable <- renderDataTable({
     table0()
-  }, rownames = FALSE)
+  })
   
   output$summaryTable2 <- renderTable({
     table0()

@@ -16,6 +16,7 @@ library(shinyjs)
 library(stringr)
 library(dplyr)
 library(shinydashboard)
+library(DT)
 
 enableBookmarking(store = "server")
 

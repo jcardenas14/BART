@@ -125,6 +125,8 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
     )
   )))
 
+old <- setwd(tempdir())
+
 #Increase maximum file size input; currently set to 1GB -- Not sure if we need more.
 options(shiny.maxRequestSize=1000*1024^2)
 shinyServer(function(input,output, session){
@@ -162,6 +164,7 @@ shinyServer(function(input,output, session){
   })
 
   list.projects <- reactive({
+    setwd(old)
     list.files("data")
   })
   
@@ -230,7 +233,6 @@ shinyServer(function(input,output, session){
     values$corr.method <- NULL
     values$corrs <- NULL
     values$corr.files <- NULL
-    #values$baylorMod <- TRUE
     setwd(route)
     for (var in vars){
       values[[var]] <- get(var, .GlobalEnv)
@@ -260,6 +262,7 @@ shinyServer(function(input,output, session){
   
   observeEvent(input$uploadExampleData,{
    withBusyIndicatorServer("uploadExampleData", {
+    setwd(old)
     mypath <- "data/Longitudinal Macaque TB Data/bartResults.rda"
     updateData(mypath, tempdir())
    })

@@ -726,7 +726,7 @@ uploadVarsRowCluster <- function(input, output, session, data, dendro){
     varnames <- read.csv(input$varSelect$datapath, header = TRUE)
     rowAnnot <- NA
     labelRows <- NULL
-    x <- data()[which(rownames(data()) %in% varnames[,1]),]
+    x <- data()[match(varnames[,1], rownames(data()), nomatch = 0), ]
     if(ncol(varnames) > 1){
       rowAnnot <- varnames[,-1,drop = FALSE]
       rowAnnot <- rowAnnot[match(rownames(x), varnames[,1], nomatch = 0),,drop = FALSE]

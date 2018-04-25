@@ -17,7 +17,7 @@ library(stringr)
 library(dplyr)
 library(shinydashboard)
 
-enableBookmarking(store = "server")
+#enableBookmarking(store = "server")
 
 source("HeatMap2.txt")
 source("helpers.R")
@@ -61,6 +61,12 @@ infoPopup <- function(title, content,
   )
 }
 
+firstUp <- function(x) {
+ substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+ x
+}
+
+old <- setwd(tempdir())
 
 mycorrection<-function(dat,alpha,correction){
   

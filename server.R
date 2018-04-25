@@ -125,39 +125,33 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
     )
   )))
 
-old <- setwd(tempdir())
-
 #Increase maximum file size input; currently set to 1GB -- Not sure if we need more.
 options(shiny.maxRequestSize=1000*1024^2)
 shinyServer(function(input,output, session){
 
-  setBookmarkExclude(c("file1"))
+  #setBookmarkExclude(c("file1"))
   output$test<-renderUI({
     if(is.null(values$rowdend3)){
       if(ctrl()$id ==TRUE){
-        try<-list("All Samples Median Normalized" = 3,
-                  "All Samples Healthy Normalized" = 4,
-                  "Non-Healthy Samples Median Normalized" = 6)
+        try<-list(3,4)
+        names(try) <- c(paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
       }
-
       if(ctrl()$id == FALSE){
-        try<-list("All Samples Median Normalized" = 3)
+        try<-list(3)
+        names(try) <- paste0("All Samples ",firstUp(values$norm.method), " Normalized")
       }
     }
 
     if(!is.null(values$rowdend3)){
       if(ctrl()$id == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"= 4,
-                  "All Samples Baseline Normalized"=5)
+        try<-list(1,2,3,4,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                        "All Samples Healthy Normalized","All Samples Baseline Normalized")
       }
 
       if(ctrl()$id == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
+        try<-list(1,3,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"), paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
       }
     }
     selectInput("set", "Select heatmap:",as.list(try))
@@ -1101,9 +1095,9 @@ output$Unsupervised <- renderMenu({
   })
 
   heatmapname<-reactive({
-    if(input$set==1) heattxt<-"Baseline Median Normalized"
+    if(input$set==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method)," Normalized")
     if(input$set==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set==3) heattxt<-"All Samples Median Normalized"
+    if(input$set==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     return(heattxt)
@@ -1294,8 +1288,8 @@ output$Unsupervised <- renderMenu({
     else{
       return(menuItem("DGE", icon = icon("area-chart"), tabName = "dge",
                       menuSubItem("Overview", tabName = "overview"),
-                      menuSubItem("Gene List Maker", tabName = "genelistmaker"),
-                      menuSubItem("Gene Search", tabName = "genesearch")))
+                      menuSubItem("Gene List Maker", tabName = "genelistmaker")))#,
+                      #menuSubItem("Gene Search", tabName = "genesearch")))
     }
   })
 
@@ -1571,29 +1565,25 @@ output$Unsupervised <- renderMenu({
   output$test1<-renderUI({
    if(is.null(values$rowdend3)){
     if(ctrl()$id ==TRUE){
-     try<-list("All Samples Median Normalized" = 3,
-               "All Samples Healthy Normalized" = 4,
-               "Non-Healthy Samples Median Normalized" = 6)
+     try<-list(3,4)
+     names(try) <- c(paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
     }
     
     if(ctrl()$id == FALSE){
-     try<-list("All Samples Median Normalized" = 3)
+     try<-list(3)
+     names(try) <- paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     }
    }
    
    if(!is.null(values$rowdend3)){
     if(ctrl()$id == TRUE){
-     try<-list("Baseline Mean Normalized" = 1,
-               "Baseline Healthy Normalized" = 2,
-               "All Samples Mean Normalized" = 3,
-               "All Samples Healthy Normalized"= 4,
-               "All Samples Baseline Normalized"=5)
+     try<-list(1,2,3,4,5)
+     names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                     "All Samples Healthy Normalized","All Samples Baseline Normalized")
     }
-    
     if(ctrl()$id == FALSE){
-     try<-list("Baseline Mean Normalized" = 1,
-               "All Samples Mean Normalized" = 3,
-               "All Samples Baseline Normalized"=5)
+     try<-list(1,3,5)
+     names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
     }
    }
    selectInput("set1", "Select heatmap:",as.list(try))
@@ -1644,9 +1634,9 @@ output$Unsupervised <- renderMenu({
   })
 
   heatmapname1<-reactive({
-    if(input$set1==1) heattxt<-"Baseline Mean Normalized"
+    if(input$set1==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method), " Normalized")
     if(input$set1==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set1==3) heattxt<-"All Samples Mean Normalized"
+    if(input$set1==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set1==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set1==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     heattxt
@@ -1795,71 +1785,7 @@ output$Unsupervised <- renderMenu({
     selectInput("comparisons_download", "Comparison:", p.names, p.names[1], multiple = TRUE)
   })
   
-  gensymb.search <- reactive({
-    dat <- values$results.file
-    genlist <- unique(dat$Gene.Symbol)
-    genlist
-  })
-
-  probe.search <- reactive({
-    dat <- values$results.file
-    selectedprobes <- dat$Transcript.ID[which(dat$Gene.Symbol %in% input$specgene)]
-    selectedprobes
-  })
-
-  output$specgene1 <- renderUI({
-    genlist <- gensymb.search()
-    withProgress(message = '',
-                 detail = 'Generating the Options...', value = 1,{
-                   selectizeInput("specgene", "Gene.Symbol selection:",
-                                  choices = genlist,
-                                  selected = genlist[1],options = list(maxOptions = 30))
-                 })
-  })
-
-  output$probeid1 <- renderUI({
-    if(is.null(input$specgene)){return(NULL)}
-    else{
-      selectedprobes <- probe.search()
-      selectizeInput("probeid", "Transcript.ID selection:", multiple = TRUE, selectedprobes,selected=selectedprobes[1], options = list(maxOptions = 30))
-    }
-  })
-
-  output$genTable <- renderUI({
-    actionButton("go3", "Generate table")
-  })
-
-  sgl_flat <- reactive({
-    results.file <- values$results.file
-    sgl <- results.file[grep("^P.Value", names(results.file))]
-    sgl_2 <- apply(sgl, 2, p.adjust, method = "bonferroni")
-    colnames(sgl_2) <- gsub("P.Value.","Bonf.P.Value.",colnames(sgl_2))
-    sgl_flat <- data.frame(results.file, sgl_2)
-    sgl_flat
-  })
-
-  specgenelist <- eventReactive(input$go3,{
-    m_newsgl <- function(sss){
-      newsgl_Gene.Symbol <- sgl_flat()[which(sgl_flat()$Gene.Symbol %in% sss),][,-2]
-      comparisons <- gsub("Estimate.", "", colnames(newsgl_Gene.Symbol)[grep("Estimate", colnames(newsgl_Gene.Symbol), fixed = TRUE)])
-      dat <- reshape2::melt(newsgl_Gene.Symbol, id.vars = "Transcript.ID")
-      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, paste0(".",rep(comparisons,each = nrow(newsgl_Gene.Symbol))),2))
-      colnames(splt) <- c("variable", "Comparison")
-      splt$Comparison <- rep(comparisons,each = nrow(newsgl_Gene.Symbol))
-      dat <- do.call("cbind", list(Transcript.ID = as.character(dat[,1]), splt, value = dat$value))
-      newdat <- reshape2::dcast(dat, Transcript.ID + Comparison ~ variable)
-      newdat <- newdat[,c(1,2,4,7,6,5,3)]
-      return(newdat)
-    }
-    xx_0 <- m_newsgl(input$specgene)
-    xx <- xx_0[which(xx_0$Transcript.ID %in% input$probeid),]
-    xx
-  })
-
-  output$specgenetable <- renderDataTable({
-    specgenelist()
-  })
-
+  
   output$genelistgraph<-renderPlot({
     plot(plotdata()$alpha,plotdata()$raw,type="l",main="Multiple Testing Comparison Plot",col="black",xlim=c(0,1),ylim=c(0,1),xlab=expression(alpha),ylab="% of Total Probes in Gene List")
     lines(plotdata()$alpha,plotdata()$fdr,col="red",lwd=2)
@@ -1868,13 +1794,6 @@ output$Unsupervised <- renderMenu({
     axis(4,at=1:10/10,labels=round(1:10/10*dim(values$results.file)[1],0))
     lines(c(0,1),c(0,1),lty=2)
   })
-
-  output$downloadCG <- downloadHandler(
-    filename = function(){paste0("Gene_Search_List","_", input$specgene,"_with_selected_probes", ".csv")},
-    content = function(file){
-      write.csv(specgenelist(), file,row.names = FALSE)
-    }
-  )
 
   output$downloadSC <- downloadHandler(
     filename = function() {paste("Significance_Comparison_Overview", '_', input$alphalevel2, '.csv', sep = '') },
@@ -3460,28 +3379,26 @@ output$Module_Select <- renderUI({
 
     if(is.null(values$rowdend3)){
       if(ctrl()$metab == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2)
+        try<-list(1,2)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized")
       }
 
       if(ctrl()$metab == FALSE){
-        try<-list("Baseline Median Normalized" = 1)
+        try<-list(1)
+        names(try) <- paste0("Baseline ",firstUp(values$norm.method), " Normalized")
       }
     }
 
     if(!is.null(values$rowdend3)){
       if(ctrl()$metab == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"=4,
-                  "All Samples Baseline Normalized"=5)
+        try<-list(1,2,3,4,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                        "All Samples Healthy Normalized","All Samples Baseline Normalized")
       }
 
       if(ctrl()$metab == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
+        try<-list(1,3,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
       }
     }
 
@@ -3546,9 +3463,9 @@ output$Module_Select <- renderUI({
   })
 
   heatmapnamem<-reactive({
-    if(input$set3==1) heattxt<-"Baseline Median Normalized"
+    if(input$set3==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method), " Normalized")
     if(input$set3==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set3==3) heattxt<-"All Samples Median Normalized"
+    if(input$set3==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set3==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set3==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     heattxt

@@ -65,7 +65,7 @@ body <-  dashboardBody(
                   uiOutput('exampleData'),
                   uiOutput('uploadExampleData'),
                   br(),
-                  bookmarkButton(),
+                  #bookmarkButton(),
                   tags$script('
                               Shiny.addCustomMessageHandler("resetFileInputHandler", function(x) {      
                               var id = "#" + x + "_progress";
@@ -362,21 +362,6 @@ body <-  dashboardBody(
     tabItem(tabName = "genelistmaker",
             fluidRow(
               uiOutput("dgeTabs")
-            )
-    ),
-    
-    tabItem(tabName = "genesearch",
-            fluidRow(
-              box(title = "Gene Selection", width = 4, status = "primary", solidHeader = FALSE,
-                  uiOutput("specgene1"),
-                  uiOutput("probeid1"),
-                  uiOutput("genTable")
-              ),
-              box(title = "Results for Specific Genes", width = 8, status = "primary", solidHeader = FALSE,
-                  helpText("The processing speed depends on the number of gene symbols and your computer's performance. It may take up to 30 seconds to proceed."),
-                  downloadButton('downloadCG','Download Table'),
-                  dataTableOutput("specgenetable")
-              )
             )
     ),
     

@@ -1,23 +1,5 @@
 #User Interface for PALO FILTER Script!
 #options(shiny.deprecation.messages = FALSE)
-require(shiny)
-#library(rmarkdown)
-#library(RColorBrewer)
-#library(fastcluster)
-#library(NMF)
-#library(grid)
-#library(clValid)
-#library(qusage)
-#library(VennDiagram)
-#library(gtools)
-#library(scales)
-#library(reshape2)
-#library(data.table)
-#library(pca3d)
-#library(shinyjs)
-#library(stringr)
-library(shinydashboard)
-library(ggplot2)
 
 function(request){
 
@@ -79,8 +61,11 @@ body <-  dashboardBody(
                   verbatimTextOutput('version'),
                   hr(),
                   fileInput('file1', 'Upload BART Files and any QC reports for the Project:', multiple = TRUE,
-                            accept=c(".Rdata",".png",".html",".csv")),
-                  bookmarkButton(),
+                            accept=c(".rda",".png",".html",".csv")),
+                  uiOutput('exampleData'),
+                  uiOutput('uploadExampleData'),
+                  br(),
+                  #bookmarkButton(),
                   tags$script('
                               Shiny.addCustomMessageHandler("resetFileInputHandler", function(x) {      
                               var id = "#" + x + "_progress";
@@ -115,46 +100,27 @@ body <-  dashboardBody(
     
     tabItem(tabName = "summary",
             fluidRow(
-              box(title = "Summary Options", width = 4, status = "primary", solidHeader = FALSE,
+              box(title = "Summarization Options", width = 4, status = "primary", solidHeader = FALSE,
                   uiOutput('summaryName'),
-                  uiOutput('respVar'),   
+                  uiOutput('groupingVar1'),  
+                  uiOutput('groupingVar2'),
                   selectInput("digits", 
                               label = "Number of decimal places:",
                               choices = c(0,1,2,3,4),
-                              selected = 1)
+                              selected = 1),
+                  checkboxInput('sortableTable', "Show Sortable Table?", FALSE)
               ),
-              box(title = "Table 1", width = 8, status = "primary", solidHeader = FALSE,
+              box(title = "Summary Table", width = 8, status = "primary", solidHeader = FALSE,
                   downloadButton('downloadSummary0', 'Download Table'),
                   br(),
-                  div(style = "display:inline-block", uiOutput("summary0Text")),
-                  div(style = "display:inline-block", helpPopup("Summary Table 1", "Given the summary variable selected by the user, statistics will be provided for 
-                                                                each category of the users BY variable selection.  In longitudinal settings, this table will display 
-                                                                a warning if the summary variable is changing over time.  Refer to Table 2.", placement = "right",
+                  div(style = "display:inline-block", uiOutput("summaryText")),
+                  div(style = "display:inline-block", helpPopup("Summary Table", "Displays summary statistics for a user selected variable of interest (numeric or categorical) with
+                                                                the option to add up to two grouping factors.", placement = "right",
                                                                 trigger = "click")),
-                  tableOutput('summary0')
+                  uiOutput('summary0')
               )
-                  ),
-            fluidRow(
-              box(title = "Table 2", width = 6, status = "primary", solidHeader = FALSE,
-                  downloadButton('downloadSummary1', 'Download Table'),
-                  br(),
-                  div(style = "display:inline-block", uiOutput("summary1Text")),
-                  div(style = "display:inline-block", helpPopup("Summary Table 2", "Given the summary variable selected by the user, statistics will be provided for 
-                                                                each category of the users BY variable selection and for each time point in longitudinal settings.", placement = "right",
-                                                                trigger = "click")),
-                  tableOutput('summary1')
-              ),
-              box(title = "Table 3", width = 6, status = "primary", solidHeader = FALSE,
-                  downloadButton('downloadSummary2', 'Download Table'),
-                  br(),
-                  div(style = "display:inline-block", uiOutput("summary2Text")),
-                  div(style = "display:inline-block", helpPopup("Summary Table 3", "For longitudinal data, this table provides the counts of subjects categorized by 
-                                                                their observed longitudinal profiles and by the specified BY variable.", placement = "right",
-                                                                trigger = "click")),
-                  tableOutput('summary2')
-              )
-                  )
-              ),
+            )
+    ),
     
     tabItem(tabName = "pvca",
             helpText("Data Filtering and Batch Assesment Summary:"),
@@ -240,10 +206,8 @@ body <-  dashboardBody(
                                     textOutput('OptimalNumber'),
                                     downloadButton('downloadHeatmapData', 'Download Data'),
                                     downloadButton("downloadHeatmap", "Download Figure"),
+                                    uiOutput("plotGeneSymbols"),
                                     helpText(""),
-                                    #div(style = "display:inline-block", checkboxInput("modulemeans", strong("Download module scores:", style = "color:#456dae"), FALSE)),
-                                    #div(style = "display:inline-block", infoPopup("Download module scores", "The downloaded data is calculated by averaging all the probes within each module.",
-                                                                                  #placement = "right", trigger = "click")),
                                     plotOutput('heatmap')
                                 )
                               )
@@ -301,6 +265,7 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Heatmap Options", width = 4, status = "primary", solidHeader = FALSE,
                                     div(style = "display:inline-block", actionButton("goMod", "Plot")),
+                                    uiOutput("baylorModules"),
                                     uiOutput("baseOrCtrl"),
                                     uiOutput("modSelection"),
                                     uploadVarsUI("mod", varType = "modules"),
@@ -330,8 +295,22 @@ body <-  dashboardBody(
                               )
                      ),
                      tabPanel("Cluster Number Diagnostics",
-                              downloadButton('downloadClusterPlot2Other', 'Download Figure'),
-                              plotOutput('modClusterPlot')
+                              div(class = "container-fluid",
+                                  div(class = "row",
+                                      div(class = "col-md-4",
+                                          h4(strong("Dunn Index")),
+                                          p("The Dunn Index is a metric used to assess the quality of a given set of clusters. When the number of clusters (n) is not known beforehand (such is the case with hierarchical clustering),
+                                            the Dunn Index is computed for n = 2 to n = half the sample size. The optimal number of clusters is chosen by the highest Dunn Index. While in some sense, metrics such as the Dunn Index
+                                            provide an objective means by which to select the optimal number of clusters, choosing cluster groupings should always entail looking at the heat maps and dendrograms to see if the number
+                                            suggested by the Dunn Index makes sense for the specific data at hand."),
+                                          p(strong("The bar plot on the right is based on the samples clustered in the previous tab."))
+                                          ),
+                                      div(class = "col-md-8",
+                                          downloadButton('downloadClusterPlot2Other', 'Download Figure'),
+                                          plotOutput('modClusterPlot')
+                                      )
+                                  )
+                              )
                      ),
                      tabPanel("Cluster Association Analysis",
                               fluidRow(
@@ -383,21 +362,6 @@ body <-  dashboardBody(
     tabItem(tabName = "genelistmaker",
             fluidRow(
               uiOutput("dgeTabs")
-            )
-    ),
-    
-    tabItem(tabName = "genesearch",
-            fluidRow(
-              box(title = "Gene Selection", width = 4, status = "primary", solidHeader = FALSE,
-                  uiOutput("specgene1"),
-                  uiOutput("probeid1"),
-                  uiOutput("genTable")
-              ),
-              box(title = "Results for Specific Genes", width = 8, status = "primary", solidHeader = FALSE,
-                  helpText("The processing speed depends on the number of gene symbols and your computer's performance. It may take up to 30 seconds to proceed."),
-                  downloadButton('downloadCG','Download Table'),
-                  dataTableOutput("specgenetable")
-              )
             )
     ),
     
@@ -536,24 +500,30 @@ body <-  dashboardBody(
                                 fluidRow(
                                   box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
                                       uiOutput("FlowDataNames"),
-                                      uiOutput("flowsub"),               
+                                      uiOutput("flowPlotGroup1"),
+                                      uiOutput("flowPlotGroup1Vals"),
+                                      uiOutput("flowPlotGroup2"),
+                                      uiOutput("flowPlotGroup2Vals"),
+                                      uiOutput("flowTrackSubjects"),
                                       checkboxInput("FlowTransform","lg2 Transform",FALSE),
-                                      helpText("Options for 1st Plot:"),
-                                      uiOutput("flowmax"),
-                                      uiOutput("flowmin"),
-                                      checkboxInput("FlowSamples","Individual curves",FALSE),
-                                      helpText("Options for 2nd Plot:"),
                                       checkboxInput("flowbox","Box Plot View",FALSE),
+                                      checkboxInput("FlowSamples","Individual curves",FALSE),
                                       downloadButton('downloadFlowData', 'Download Data')
                                   ),
-                                  box(title = "Figures", width = 8, status = "primary", solidHeader = FALSE,
-                                      downloadButton('downloadFlowPlot', 'Download Figure'),
-                                      plotOutput("FlowPlot"),
-                                      downloadButton('downloadFlowPlot2', 'Download Figure'),
-                                      plotOutput("FlowPlot2"),
-                                      downloadButton('downloadFlowSummaries','Download Table'),
-                                      dataTableOutput("FlowPlotSummary")
-                                  )
+                                  column(width = 8,
+                                         fluidRow(
+                                           box(title = "Figure", width = 12, status = "primary", solidHeader = FALSE,
+                                               downloadButton('downloadFlowPlot', 'Download Figure'),
+                                               plotOutput("FlowPlot")
+                                           )
+                                         ),
+                                         fluidRow(
+                                           box(title = "Table", width = 12, status = "primary", solidHeader = FALSE,
+                                               downloadButton('downloadFlowSummaries','Download Table'),
+                                               dataTableOutput("FlowPlotSummary")
+                                           ) 
+                                         )
+                                  ) 
                                 )
                        )
                 )

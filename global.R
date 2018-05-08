@@ -1,28 +1,26 @@
-enableBookmarking(store = "server")
-load("moduleinfo.rda")
-load("moduleinfo_rna.rda")
-moduleinfo2<-qusage::read.gmt("BaylorModules.gmt")
-x1<-unlist(moduleinfo2)
-x2<-rep(names(moduleinfo2),times=lapply(moduleinfo2,length))
-x2<-gsub("_",".",x2)
-moduleinfo2<-data.frame(SYMBOL=x1,Module=x2)
-names(moduleinfo)[6] <- "affy"
-names(moduleinfo)[8] <- "Module_V3"
-module_annotations <- read.csv("v2_annotated_module_list.csv", header = T)
-moduleinfo$Modulev2_Annotation <- module_annotations[match(moduleinfo$Module, module_annotations$Module), 2]
-moduleinfo_rna$Modulev2_Annotation <- module_annotations[match(moduleinfo_rna$Module, module_annotations$Module), 2]
+library(shiny)
+library(ggplot2)
+library(RColorBrewer)
+library(fastcluster)
+library(NMF)
+library(grid)
+library(clValid)
+library(VennDiagram)
+library(shinydashboard)
+library(gtools)
+library(scales)
+library(reshape2)
+library(data.table)
+library(pca3d)
+library(shinyjs)
+library(stringr)
+library(dplyr)
+library(shinydashboard)
 
-get_all_tables <- function(dat, my_i){
-  nam <- names(dat)
-  index1 <- grep("p.Value",nam,fixed=T)
-  index2 <- grep("log10",nam,fixed=T)
-  p.nams <- nam[setdiff(index1,index2)]
-  nams <- gsub("p.Value.for.Estimate.of.", "", p.nams)
-  sc_n <- paste0("sc_", my_i)
-  assign(sc_n, data.frame(dat[, c(1, 2)], dat[, grep(nams[my_i], names(dat))]))
-  write.csv(get(paste0("sc_", my_i)), file = paste0(nams[my_i], ".csv"))
-}
+#enableBookmarking(store = "server")
 
+source("HeatMap2.txt")
+source("helpers.R")
 helpPopup <- function(title, content,
                       placement=c('right', 'top', 'left', 'bottom'),
                       trigger=c('click', 'hover', 'focus', 'manual')) {
@@ -63,7 +61,12 @@ infoPopup <- function(title, content,
   )
 }
 
-source("HeatMap2.txt")
+firstUp <- function(x) {
+ substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+ x
+}
+
+old <- setwd(tempdir())
 
 mycorrection<-function(dat,alpha,correction){
   
@@ -81,14 +84,14 @@ mycorrection<-function(dat,alpha,correction){
 
 flowlistmaker <- function(dat, var_name, alpha = 0.05, method = "FDR"){
   
-  var_name_1 <- paste0("P.Value for ", var_name)
+  var_name_1 <- paste0("P.Value.", var_name)
   pvalues <- dat[, var_name_1]
   sorted_p <- pvalues[order(pvalues)]
   index3 <- grep(var_name, names(dat), fixed = TRUE)
   
   #Fixing bug if contrast are written very similarly where
   #grep can't tell the difference        
-  allpvalnames_ind <- grep("P.Value", names(dat)[index3])
+  allpvalnames_ind <- grep("^P.Value", names(dat)[index3])
   pvalnames <- names(dat)[index3][allpvalnames_ind]
   #log10pval_index <- grep("Sign_neg_log10", names(dat)[index3])
   #ind<-setdiff(allpvalnames_ind,log10pval_index)
@@ -118,76 +121,6 @@ flowlistmaker <- function(dat, var_name, alpha = 0.05, method = "FDR"){
   return(data.frame(Flow_Variable = flow_list))
 }
 
-movetolast <- function(dat, move) {
-  dat[c(setdiff(names(dat), move), move)]
-}
-
-genelistmaker<-function(dat,var_name,alpha=.05,method="FDR",module_merge=FALSE){
-  pvalues<-dat[,var_name]
-  sorted_p<-pvalues[order(pvalues)]
-  index3<-grep(substring(var_name,24),names(dat),fixed=T)
-  
-  #Fixing bug if contrast are written very similarly where
-  #grep can't tell the difference        
-  allpvalnames_ind<-grep("p.Val",names(dat)[index3])
-  allpvalnames<-names(dat)[index3][allpvalnames_ind]
-  log10pval_index<-grep("log10",names(dat)[index3])
-  ind<-setdiff(allpvalnames_ind,log10pval_index)
-  pvalnames<-names(dat)[index3][ind]
-  n_pvalnames<-length(pvalnames)
-  
-  if(n_pvalnames>1){div<-length(index3)/n_pvalnames
-  indicator1<-nchar(pvalnames)  
-  trueval<-nchar(var_name)
-  trueindex<-which(indicator1==trueval)
-  newindex<-c()
-  for(i in 1:div){
-    newindex[i]<-index3[(trueindex+n_pvalnames*(i-1))]     }
-  index3<-newindex  
-  }
-  ############################
-  newdat<-cbind(dat$PROBE_ID,dat$SYMBOL,dat[,index3],p.adjust(pvalues,"fdr"),p.adjust(pvalues,"bonferroni"))
-  names(newdat)<-c("PROBE_ID","SYMBOL",names(dat)[index3],paste(var_name,"FDR",sep=""),paste(var_name,"BONF",sep=""))
-  
-  sort.dat<-newdat[order(dat[,var_name]),]
-  if(method=="FDR"){       #k<-1:(dim(dat)[1])
-                           #index<-alpha*k/dim(dat)[1]
-                           maxk<-ifelse( length(which(p.adjust(sorted_p,"fdr")<=alpha))==0,0,max(which(p.adjust(sorted_p,"fdr")<=alpha)))
-                           if(maxk!=0){PROBE_ID<-sort.dat[1:maxk,]}
-                           if(maxk==0){PROBE_ID<- "No Genes Present"}       
-  }
-  if(method=="Raw"){       maxp<- ifelse(length(which(sorted_p<=alpha)) == 0,0,max(which(sorted_p<=alpha)))
-                           if(maxp != 0){PROBE_ID<-sort.dat[1:maxp,]}
-                           if(maxp == 0){PROBE_ID<- "No Genes Present"}
-  }
-  if(method=="Bonferroni"){     maxp<-ifelse( length(which(p.adjust(sorted_p,"bonferroni")<=alpha))==0,0,max(which(p.adjust(sorted_p,"bonferroni")<=alpha)))
-                                if(maxp!=0){PROBE_ID<-sort.dat[1:maxp,]}
-                                if(maxp==0){PROBE_ID<- "No Genes Present"}
-  }
-  if(module_merge==TRUE){ PROBE_ID<-merge(PROBE_ID,moduleinfo,by="PROBE_ID",all.x = TRUE)
-  index4<- which( !(names(PROBE_ID)%in%c("PROBE_ID","SYMBOL","Module","Module_V3","Modulev2_Annotation","Modulev3_Annotation")))   
-  name2<-names(PROBE_ID)[index4]
-  PROBE_ID<-cbind(PROBE_ID[,c("PROBE_ID","SYMBOL","Module","Modulev2_Annotation")],PROBE_ID[,index4])    
-  names(PROBE_ID)<-c("PROBE_ID","SYMBOL","Module","Modulev2_Annotation",name2)
-  PROBE_ID<-PROBE_ID[order(PROBE_ID[,var_name]),]
-  }
-  PROBE_ID <- data.frame(PROBE_ID)
-  return(PROBE_ID)
-}
-
-
-setPalettes = function(n) {
-  pal = list("Spectral", "PuOr", "PiYG","RdGy","PRGn","RdBu","RdYlBu")
-  sel = pal[1:n]
-  lapply(sel, getColor)
-}
-
-#BrBG PiYG PRGn PuOr RdBu RdGy RdYlBu RdYlGn Spectral
-
-
-getLevels = function(x) {
-  as.character(levels(x))
-}
 
 getNorm <- function(x, y, colname, id, mynames, index_sid, index_refvar,
                     ref_level, keep = TRUE) {
@@ -219,200 +152,59 @@ getNorm2 <- function(y, colnames_lev, colnames_lev_rm, keep = TRUE) {
   return(normdat)
 }
 
-dataManipulate <- function(y, x, colname, ref_var, ref_level, long = FALSE,
-                           subjects, keep = TRUE, format = "Probes",
-                           allsamples = TRUE) {
-  index_samples <- which(names(y) %in% x[, colname])
-  if (format == "Probes") {
-    index_ps <- which(names(y) %in% c("PROBE_ID", "SYMBOL"))
-  }
-  if (format == "Modules") {
-    index_ps <- which(names(y) %in% c("Module"))
-  }
-  y <- y[, c(index_ps, index_samples)]
-  if (allsamples == FALSE) {
-    if (long == TRUE) {
-      index_refvar <- which(names(x) == ref_var)
-      lev <- x[which(x[, index_refvar] == ref_level), ]
-      lev_rm <- x[which(x[, index_refvar] != ref_level), ]
-      index_subid <- which(names(x) == subjects)
-      lev_subids <- unique(lev[, index_subid])
-      lev_rm_subids <- unique(lev_rm[, index_subid])
-      index_include <- lev_subids %in% lev_rm_subids
-      complete_ids <- lev_subids[index_include]
-      lev_norm <- vector("list", length(complete_ids))
-      for (i in 1:(length(lev_norm))) {
-        lev_norm[[i]] <- getNorm(y = y, x = x, colname = colname,
-                                 id = complete_ids[i], index_sid = index_subid,
-                                 mynames = c(subjects, "columnname", ref_var),
-                                 index_refvar = index_refvar,
-                                 ref_level = ref_level, keep = keep)
+manipulateData <- function(y, x, colname, norm.method = "mean", ref.var = NULL, 
+                           ref.val = NULL, long = FALSE, subject.id = NULL, 
+                           keep.ref = TRUE) {
+  y <- y[, match(x[, colname], colnames(y), nomatch = 0)]
+  x <- x[match(colnames(y), x[, colname], nomatch = 0), ]
+  if (!is.null(ref.var) & !is.null(ref.val)) {
+    if (!long) {
+      y.norm <- y - apply(y[, x[, ref.var] == ref.val], 1, norm.method, 
+                          na.rm = TRUE)
+      x.norm <- x
+      if (!keep.ref) {
+        y.norm <- y.norm[, x[, ref.var] != ref.val]
+        x.norm <- x[match(colnames(y.norm), x[, colname], nomatch = 0), ]
       }
-      lev_norm <- do.call("cbind", lev_norm)
-      #design_norm <- x[(x[, index_subid] %in% complete_ids), ]
-      design_norm <- x[match(colnames(lev_norm), x$columnname, nomatch = 0),]
-      #if (keep == FALSE) {
-        #design_norm <- design_norm[(design_norm[, index_refvar] != ref_level), ]
-      #}
     }
-    if (long == FALSE) {
-      index_refvar <- which(names(x) == ref_var)
-      lev <- x[which(x[, index_refvar] == ref_level), ]
-      lev_rm <- x[which(x[, index_refvar] != ref_level), ]
-      lev_names <- lev[, colname]
-      lev_rm_names <- lev_rm[, colname]
-      lev_norm <- getNorm2(y = y, lev_names, lev_rm_names, keep = keep)
-      design_norm <- x[match(colnames(lev_norm), x$columnname, nomatch = 0),]
-      #if (keep == FALSE) {
-        #design_norm <- lev_rm
-      #}
-      #if (keep == TRUE) {
-        #design_norm <- x
-      #}
+    if (long) {
+      if (!is.null(subject.id)) {
+        subjects.ref <- as.character(
+          unique(x[, subject.id][x[, ref.var] == ref.val])
+        )
+        subjects.not.ref <- as.character(
+          unique(x[, subject.id][x[, ref.var] != ref.val])
+        )
+        subjects <- intersect(subjects.ref, subjects.not.ref)
+        y.norm <- list()
+        for (i in 1:length(subjects)) {
+          index <- x[, subject.id] %in% subjects[i]
+          index.ref <- index & x[, ref.var] == ref.val
+          y.norm[[i]] <- y[, index] - y[, index.ref]
+        }
+        y.norm <- data.frame(do.call("cbind", y.norm))
+        x.norm <- x[match(colnames(y.norm), x[, colname], nomatch = 0), ]
+        if (!keep.ref) {
+          y.norm <- y.norm[, x.norm[, ref.var] != ref.val]
+          x.norm <- x[match(colnames(y.norm), x[, colname], nomatch = 0), ]
+        }
+      }
+      if (is.null(subject.id)) {
+        return(
+          warning("Must specify subject.id when long = TRUE")
+        )
+      }
     }
   } else {
-    means_y <- as.vector(apply(y[, -(1:2)], 1, mean))
-    lev_norm <- y[, -c(1:2)] - means_y
-    design_norm <- x
+    y.norm <- y - apply(y, 1, norm.method, na.rm = TRUE)
+    x.norm <- x
   }
-  final_norm_shuff <- as.matrix(lev_norm)
-  colnames(final_norm_shuff) <- names(lev_norm)
-  if (format == "Probes") {
-    rownames(final_norm_shuff) <- y$SYMBOL
-  }
-  if (format == "Modules") {
-    rownames(final_norm_shuff) <- y$Module
-  }
-  return(list(heatexp = final_norm_shuff, heatdes = design_norm))
+  normData <- list(exprs.norm = y.norm, design.norm = x.norm)
+  return(normData)
 }
 
-
-data.manipulate<-function(exp,des,basevariable,baselevel,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=T){
-  index.samples<-which(names(exp) %in% des$columnname)
-
-  if(format=="Probes"){ 
-            index.ps<-which(names(exp) %in% c("PROBE_ID","SYMBOL"))
-                               }
-  if(format=="Modules"){
-            index.ps<-which(names(exp) %in% c("Module"))
-                                }
-exp<-exp[,c(index.ps,index.samples)]
-
-if(allsamples==FALSE){
-if (longitudinal==TRUE){
-            index.basevar<-which(names(des)==basevariable)
-            base<-des[which(des[,index.basevar]==baselevel),]
-		all_time_base_rm<-des[which(des[,index.basevar]!=baselevel),]
-
-            index.subjectid<-which(names(des)==subjects)
-		base_subject_ids<-unique(base[,index.subjectid])
-		
-            all_time_base_rm_subject_ids<-unique(all_time_base_rm[,index.subjectid])
-
-		index.include<-base_subject_ids%in%all_time_base_rm_subject_ids
-
-		#"complete_ids" is a list of subject ids that have a "basevariable" of "baselevel" as well as other "baselevel" observations
-
-		complete_ids<-base_subject_ids[index.include]
-         
-		columnname<-names(exp)[-index.ps]
-
-get.norm<-function(id,mynames,index.sid,index.basevar,baselevel,keep=TRUE){ data1<-des[which(des[,index.sid]==id),mynames]
-				base_name<-data1[which(data1[,3]==baselevel),"columnname"]
-                        if(keep==TRUE){
-                        base_norm1<-exp[,as.character(data1$columnname)]-exp[,as.character(base_name)]
-                        }
-                        if(keep==FALSE){
-                        
-                        base_norm1<-exp[,setdiff(as.character(data1$columnname),as.character(base_name))]-exp[,as.character(base_name)]
-                        if(length(setdiff(as.character(data1$columnname),as.character(base_name)))==1){
-                                                  base_norm1=data.frame(base_norm1)
-                                                  names(base_norm1)<-as.character(data1$columnname[which(as.character(data1$columnname)!=as.character(base_name))])}
-				}
-				return(base_norm1)
-			     }
-
-
-            base_norm<-get.norm(id=complete_ids[1],mynames=c(subjects,"columnname",basevariable),index.sid=index.subjectid,index.basevar=index.basevar,baselevel=baselevel,keep=keepbase)
-		for(i in 2:(length(complete_ids))){base_norm<-cbind(base_norm,get.norm(complete_ids[i],c(subjects,"columnname",basevariable),index.subjectid,index.basevar,baselevel,keep=keepbase))}
-
-		design_base_norm<-des[(des[,index.subjectid]%in%complete_ids),]
-            if(keepbase==FALSE){design_base_norm<-design_base_norm[which(design_base_norm[,index.basevar]!=baselevel),]}
-                        }
-
-
-
-if (longitudinal==FALSE){
-		index.basevar<-which(names(des)==basevariable)
-            base<-des[which(des[,index.basevar]==baselevel),]
-            base_rm<-des[which(des[,index.basevar]!=baselevel),]
-            base_names<-base[,"columnname"]
-            base_rm_names<-base_rm[,"columnname"]
-             
-get.norm2<-function(baseline,rest,keep=TRUE){index.base<-which(names(exp)%in%baseline)
-                        index.rest<-which(names(exp) %in%rest )
-				if(keep==FALSE){
-				normdat<-exp[,index.rest]-apply(exp[,index.base],1,mean)
-				#names(normdat)<-names(exp)[index.rest]
-				}
-                        if(keep==TRUE){
-				#normdat<-exp[,-c(1,2)]-apply(exp[,index.base],1,mean)
-                        normdat<-exp[,c(index.base,index.rest)]-apply(exp[,index.base],1,mean)
-                        #names(normadat)<-names(exp[,-c(1,2)])  
-                        }
-                        return(normdat)
-		           }
-		base_norm<-get.norm2(base_names,base_rm_names,keep=keepbase)
-            
-            if(keepbase==FALSE){design_base_norm<-base_rm}
-            if(keepbase==TRUE){design_base_norm<-des}
-			}	
-    }
-
-if(allsamples==TRUE){
-    myfactor<-as.vector(apply(exp[,-(1:2)],1,mean))
-    base_norm<-exp[,-(1:2)]-myfactor
-    design_base_norm<-des
-    }
-if(lg2==TRUE){base_norm=log(base_norm,2)}
-
-#Data is normalized with an updated design file.  Normalized exp file still doesn't have
-#Probe and Symbol attached will do in a moment.
-
-#Now we rearrange the columns based on "ordernames".
-# if(length(ordernames)>0){
-#            data1<-design_base_norm[,c("Columnname",ordernames)]
-#            inside<-paste("data1$",ordernames,sep="")
-#            column_index<-eval(parse(text=paste("order(",paste(inside,collapse=","),")",sep="")))
-#	      sorted.data<-base_norm[,column_index]}
-#        if(length(ordernames)==0){sorted.data=base_norm}
-		
-#final_norm_shuff<-cbind(exp[,index.ps],sorted.data)
-#names(final_norm_shuff)<-c(names(exp[,index.ps]),names(sorted.data))
-
-#final_norm_shuff<-as.matrix(sorted.data)
- final_norm_shuff<-as.matrix(base_norm)
- colnames(final_norm_shuff)<-names(base_norm)
- if(format=="Probes"){rownames(final_norm_shuff)<-exp$SYMBOL}
- if(format=="Modules"){rownames(final_norm_shuff)<-exp$Module}
-
-
-return(list(heatexp=final_norm_shuff,heatdes=design_base_norm))
-}
-
-
-moduleinfo1<-read.table("module_v2only_complete.txt",header=T,sep=",")
-modnames<-unique(moduleinfo1$Module)
-y<-unlist(strsplit(as.character(modnames),".",fixed=TRUE))
-y<-matrix(y,byrow=T,nrow=260,ncol=2)
-sortmodnames<-as.character(modnames)[order(y[,1],y[,2])]
-Modulelist<-list(as.character(moduleinfo1$PROBE_ID[which(moduleinfo1$Module==sortmodnames[1])]),as.character(moduleinfo1$PROBE_ID[which(moduleinfo1$Module==sortmodnames[2])]))
-for(i in 3:length(sortmodnames)){Modulelist<-c(Modulelist,list(as.character(moduleinfo1$PROBE_ID[which(moduleinfo1$Module==sortmodnames[i])])))}
-names(Modulelist)<-sortmodnames
 
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  #library(grid)
-  
   # Make a list from the ... arguments and plotlist
   plots <- c(list(...), plotlist)
   
@@ -446,6 +238,29 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 
+summarizeData <- function(data, numeric.vars, by = NULL, data.type = "Flow.variable"){
+ df <- data
+ if(!is.null(by)){
+  df <- group_by_at(data, by)
+ }
+ df2 <- list()
+ for(i in 1:length(numeric.vars)){
+  df2[[i]] <- data.frame(summarise_at(df, .vars = c(numeric.vars[i]), .funs = funs(Mean = mean(.,na.rm=TRUE), Sd = sd(.,na.rm=TRUE), N = sum(!is.na(.)))))
+  df2[[i]] <- cbind(numeric.vars[i], df2[[i]])
+ }
+ results <- do.call(rbind, df2)
+ colnames(results)[1] <- data.type
+ return(results)
+}
+
+sum.custom <- function(x){
+  result <- sum(x, na.rm = TRUE)
+  if(all(is.na(x))){
+    result <- 0
+  }
+  return(result)
+}
+
 
 ## Shiny Modules
 
@@ -476,15 +291,18 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
   results <- data()
   if(data.type %in% c("genes", "flow", "metab")){
     if(data.type == "genes"){
-      results <- results[,c(1,2,grep(comparison(), colnames(results), fixed = TRUE))]
+      results <- results[,c(1,2,which(colnames(results) %in% paste0("Estimate.", comparison()) | colnames(results) %in% paste0("Test.statistic.", comparison()) | 
+                                      colnames(results) %in% paste0("P.Value.", comparison()) | colnames(results) %in% paste0("FDR.P.Value.", comparison())))]
     } else{
-      results <- results[,c(1,grep(comparison(), colnames(results), fixed = TRUE))]
+      results <- results[,c(1,2,which(colnames(results) %in% paste0("Estimate.", comparison()) | colnames(results) %in% paste0("Test.statistic.", comparison()) | 
+                                       colnames(results) %in% paste0("P.Value.", comparison()) | colnames(results) %in% paste0("FDR.P.Value.", comparison())))]
     }
-    fdr <- p.adjust(results[,5], method = "fdr")
+    #fdr <- p.adjust(results[,5], method = "fdr")
+    #fdr <- results[,6]
     bonf <- p.adjust(results[,5], method = "bonferroni")
-    results <- do.call("cbind", list(results, FDR = fdr, Bonf = bonf))
+    results <- do.call("cbind", list(results, Bonf = bonf))
     if(data.type == "genes"){
-      colnames(results) <- c("PROBE_ID", "SYMBOL", "Log2FC", "Test.Statistic", "P.Value", "FDR", "Bonferroni")
+      colnames(results) <- c("Transcript.ID", "Gene.Symbol", "Log2FC", "Test.Statistic", "P.Value", "FDR", "Bonferroni")
     } else if(data.type == "flow"){
       results[,2] <- NULL
       colnames(results) <- c("Flow.Variables","Log2FC", "Test.Statistic", "P.Value", "FDR", "Bonferroni")
@@ -513,7 +331,7 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
     if(nrow(results) == 0){
       if(data.type == "genes"){
         results <- data.frame("No Genes Present")
-        names(results) <- "PROBE_ID"
+        names(results) <- "Transcript.ID"
       } else if(data.type == "flow"){
         results <- data.frame("No Flow Variables Present")
         names(results) <- "Flow.Variables"
@@ -581,13 +399,13 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
   if(data.type == "percents"){
     dataset <- data()
     nam <- colnames(dataset)
-    index <- grep("P.Value",nam,fixed=T)
-    p.names <- gsub("P.Value for ","",nam[index])
-    y <- as.matrix(dataset[,index])
+    index <- grep("^P.Value",nam)
+    p.names <- gsub("P.Value.","",nam[index])
+    y <- as.matrix(dataset[,index, drop = FALSE])
     if(input$correction_method == "Raw"){
       dat<-y
     } else if(input$correction_method == "FDR"){
-      dat<-apply(y,2,p.adjust,method="fdr")
+      dat<-as.matrix(dataset[,grep("FDR.P.Value", colnames(dataset)), drop = FALSE])
     } else if(input$correction_method == "Bonferroni"){
       dat<-apply(y,2,p.adjust,method="bonferroni")
     }
@@ -596,7 +414,7 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
     dat[dat == 2] <- 1
     
     fcindex <- grep("Estimate",colnames(dataset),fixed=T)
-    dataset.fcindex <- dataset[,fcindex]
+    dataset.fcindex <- dataset[,fcindex, drop = FALSE]
     if(input$showfc == TRUE){
       dataset.fcindex[dataset.fcindex < input$fcval & dataset.fcindex > -input$fcval] <- 0
       sign.dat <- sign(dataset.fcindex)
@@ -611,12 +429,12 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
       sign.dat <- sign(dataset.fcindex)
       dat <- sign.dat*dat
     }
-    dat <- data.frame(cbind(PROBE_ID = as.character(dataset$PROBE_ID),dat))
-    dat <- merge(dat, geneList(), by = "PROBE_ID")
-    dat$PROBE_ID <- NULL
+    dat <- data.frame(cbind(Transcript.ID = as.character(dataset$Transcript.ID),dat))
+    dat <- merge(dat, geneList(), by = "Transcript.ID")
+    dat$Transcript.ID <- NULL
     count_matrix <- list()
     for(i in 1:length(index)){
-      count_matrix[[i]] <- aggregate(as.formula(paste(names(dat)[i],"~","Module",sep="")),data=dat,sum)
+      count_matrix[[i]] <- aggregate(as.formula(paste(names(dat)[i],"~","Module",sep="")),data=dat,sum.custom, na.action = na.pass)
       rownames(count_matrix[[i]]) <- as.character(count_matrix[[i]]$Module)
       count_matrix[[i]]$Module <- NULL
     }
@@ -744,7 +562,11 @@ subsetAndOrder <- function(input, output, session, des, data, sampleAnnot){
   }
   for(i in 1:ncol(colAnnot)){
     if(length(unique(colAnnot[,i])) > 10){
-      colAnnot[,i] <- as.numeric(as.factor(as.character(colAnnot[,i])))
+      if(is.numeric(colAnnot[,i])){
+        colAnnot[,i] <- colAnnot[,i]
+      } else{
+        colAnnot[,i] <- as.numeric(as.factor(as.character(colAnnot[,i])))
+      }
     }
   }
   return(list(dat = x.ord, colAnnot = colAnnot, design = design))
@@ -891,8 +713,8 @@ uploadVarsUI <- function(id, varType){
   ns <- NS(id)
   condCall1 <- paste0("input['",ns("uploadVars"),"']")
   uploadType <- paste0("Upload ", varType, ":")
-  uploadDescription <- paste0("Allows the user to provide their own list of ", varType, " (CSV) to plot. The CSV file should contain a single column named 'PROBE_ID' or 'SYMBOL', 
-                               depending on whether the list provided is the PROBE ID's or gene symbols.") 
+  uploadDescription <- paste0("Allows the user to provide their own list of ", varType, " (CSV) to plot. The CSV file should contain a single column named 'Transcript.ID' or 'Gene.Symbol', 
+                               depending on whether the list provided are transcript ids or gene symbols") 
   
   tagList(
     div(style = "display:inline-block", checkboxInput(ns("uploadVars"), strong(uploadType, style = "color:#456dae"), FALSE)),
@@ -908,9 +730,13 @@ uploadVarsUI <- function(id, varType){
 uploadVarsRowCluster <- function(input, output, session, data, dendro){
   if(input$uploadVars){
     varnames <- read.csv(input$varSelect$datapath, header = TRUE)
+    rowAnnot <- NA
     labelRows <- NULL
-    #x <- data()[which(rownames(data()) %in% varnames[,1]),]
-    x <- data()[match(varnames[,1], rownames(data()), nomatch = 0),]
+    x <- data()[match(varnames[,1], rownames(data()), nomatch = 0), ]
+    if(ncol(varnames) > 1){
+      rowAnnot <- varnames[,-1,drop = FALSE]
+      rowAnnot <- rowAnnot[match(rownames(x), varnames[,1], nomatch = 0),,drop = FALSE]
+    }
     if(input$rowCluster){
       dist <- dist(x)
       hcl <- fastcluster::hclust(dist)
@@ -924,10 +750,11 @@ uploadVarsRowCluster <- function(input, output, session, data, dendro){
   } else {
     x <- data()
     x <- x[order.dendrogram(dendro()),]
+    rowAnnot <- NA
     ddm <- NA
     labelRows = NA
   }
-  return(list(ddm = ddm, x = x, labelRows = labelRows))
+  return(list(ddm = ddm, x = x, labelRows = labelRows, rowAnnot = rowAnnot))
 }
 
 # Heatmap Graphing Options

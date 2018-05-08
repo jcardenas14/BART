@@ -969,7 +969,14 @@ output$Unsupervised <- renderMenu({
   output$downloadModMap3Other <- downloadHandler(
     filename = function() {paste(values$project.name,'_Longitudinal_ModuleMapData','.csv', sep='')  },
     content = function(file) {
-      write.csv(heatDataDownload(), file, row.names = TRUE)
+      x <- modOrderedData()$x
+      if(!is.na(modRowCluster()$ddm)){
+       x <- x[order.dendrogram(modRowCluster()$ddm),]
+      }
+      if(!is.na(modClusterData()$colddm)){
+       x <- x[,order.dendrogram(modClusterData()$colddm)]
+      }
+      write.csv(x, file, row.names = TRUE)
     }
   )
 

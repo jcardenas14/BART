@@ -12,6 +12,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       )
   ),
   box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
+      uiOutput("baylorMods"),
       uiOutput('downloadModMap'),
       uiOutput('moduleMap'),
       helpText("Right click on hyperlinks to open in new window"),
@@ -69,6 +70,7 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
       helpText(""),
       downloadButton('downloadHeatmap1', 'Download Data'),
       downloadButton('downloadHeatmap2', 'Download Figure'),
+      checkboxInput("dgePlotGeneSymbols", strong("Plot Gene Symbols?"), FALSE),
       plotOutput("heatmap1")
   )
   )), list(Title = "Venn Diagram", Content =  fluidRow(
@@ -100,8 +102,8 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
         uiOutput("dgeModSelection"),
         br(),
         div(style = "display:inline-block", checkboxInput("uploadModules", strong("Upload modules", style = "color:#456dae"), FALSE)),
-        div(style = "display:inline-block", infoPopup("Upload modules", "Allows the user to provide their own list of modules (CSV) to plot. The CSV file should contain a single column named 'PROBE_ID' or 'SYMBOL', 
-                                                      depending on whether the list provided is the PROBE ID's or gene symbols.", placement = "right", trigger = "click")),
+        div(style = "display:inline-block", infoPopup("Upload modules", "Allows the user to provide their own list of modules (CSV) to plot. The CSV file should contain a single column named 'Transcript.ID' or 'Gene.Symbol', 
+                                                      depending on whether the list provided is the PROBE ID's or gene Gene.Symbols.", placement = "right", trigger = "click")),
         conditionalPanel(condition = "input.uploadModules",
                          fileInput('modSelect', '', multiple = FALSE, accept=c(".csv"))
         ),
@@ -127,54 +129,57 @@ tabs.content <- list(list(Title = "Gene Lists", Content = fluidRow(
 options(shiny.maxRequestSize=1000*1024^2)
 shinyServer(function(input,output, session){
 
-  setBookmarkExclude(c("file1"))
+  #setBookmarkExclude(c("file1"))
   output$test<-renderUI({
-    if(is.null(values$h3_rowdendro)){
-      if(values$hc ==TRUE){
-        try<-list("All Samples Median Normalized" = 3,
-                  "All Samples Healthy Normalized" = 4,
-                  "Non-Healthy Samples Median Normalized" = 6)
+    if(is.null(values$rowdend3)){
+      if(ctrl()$id ==TRUE){
+        try<-list(3,4)
+        names(try) <- c(paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
       }
-
-      if(values$hc == FALSE){
-        try<-list("All Samples Median Normalized" = 3)
+      if(ctrl()$id == FALSE){
+        try<-list(3)
+        names(try) <- paste0("All Samples ",firstUp(values$norm.method), " Normalized")
       }
     }
 
-    if(!is.null(values$h3_rowdendro)){
-      if(values$hc == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"= 4,
-                  "All Samples Baseline Normalized"=5)
+    if(!is.null(values$rowdend3)){
+      if(ctrl()$id == TRUE){
+        try<-list(1,2,3,4,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                        "All Samples Healthy Normalized","All Samples Baseline Normalized")
       }
 
-      if(values$hc == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
+      if(ctrl()$id == FALSE){
+        try<-list(1,3,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"), paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
       }
     }
     selectInput("set", "Select heatmap:",as.list(try))
   })
 
-  dir.projects <- reactive({
-    "C:/Users/e89628/Documents/Intern/BartDownloadFilesForTesting/BART"
-  })
-
   list.projects <- reactive({
-    list.files(dir.projects())
+    setwd(old)
+    list.files("data")
   })
-
-  get.wd <- eventReactive(input$uploadserver,{return(getwd())})
-
+  
+  output$exampleData <- renderUI({
+   selectizeInput("exampleData", "Select example BART results file for Demo:", choices = list.projects(), multiple = TRUE, selected = NULL,
+                  options = list(maxItems = 1))
+  })
+  
+  output$uploadExampleData <- renderUI({
+   if(is.null(input$exampleData)){return(NULL)}
+   withBusyIndicatorUI(
+    actionButton("uploadExampleData", "Upload Demo BART file", class = "btn-primary", style = "color: white; background-color: #363f47")
+   )
+  })
 
   fileindex<-reactive({
+    if(is.null(input$file1)){return(NULL)}
     index1<-c()
     index1[1]<-which(input$file1$name == "pvca1.png")
     index1[2]<-which(input$file1$name == "pvca2.png")
-    index1[3]<-which(input$file1$name == "Unsupervised.Rdata")
+    index1[3]<-which(input$file1$name == "bartResults.rda")
     index1
   })
 
@@ -182,63 +187,197 @@ shinyServer(function(input,output, session){
 
   updateData <- function(path, route){
     vars <- load(file = path, envir = .GlobalEnv)
-    values$sample_id <- NULL
-    values$responder_var <- NULL
-    values$final_expression <- NULL
-    values$qusage_results <- NULL
-    values$flow_data <- NULL
-    values$results_file <- NULL
-    values$mod1 <- NULL
-    values$mod2 <- NULL
-    values$moduleinfo2 <- NULL
-    values$correlations <- NULL
-    values$ModulesTF <- NULL
-    values$baylorMod <- TRUE
-    values$base_ctrl <- NULL
-    values$long_ctrl <- NULL
-    values$long_base <- NULL
+    values$exprs <- NULL
+    values$design <- NULL
+    values$scores.ctrl <- NULL
+    values$scores.base <- NULL
     values$modules <- NULL
-    values$roast_results <- NULL
-    values$dgeGeneSets <- NULL
-    values$dgeGeneSetAnnotations <- NULL
+    values$rowdend1b <- NULL
+    values$rowdend2b <- NULL
+    values$rowdend1 <- NULL
+    values$rowdend2 <- NULL
+    values$rowdend3 <- NULL
+    values$norm.method <- "mean"
+    values$dist.method <- "euclidean"
+    values$agg.method <- "complete"
+    values$time.var <- NULL
+    values$control.var <- NULL
+    values$control.val <- NULL
+    values$baseline.var <- NULL
+    values$baseline.val <- NULL
+    values$sample.id <- NULL
+    values$subject.id <- NULL
+    values$results.file <- NULL
+    values$dge.gsets <- NULL
+    values$dge.annots <- NULL
+    values$qusage.results <- NULL
+    values$lower.ci <- NULL
+    values$upper.ci <- NULL
+    values$gene.sets <- NULL
+    values$annots <- NULL
+    values$roast.results <- NULL
+    values$flow.results <- NULL
+    values$flow.data <- NULL
+    values$metab.results <- NULL
+    values$metab.data <- NULL
+    values$corr.num <- NULL
+    values$corr.names <- NULL
+    values$x.var <- NULL
+    values$y.var <- NULL
+    values$corr.method <- NULL
+    values$corrs <- NULL
+    values$corr.files <- NULL
     setwd(route)
     for (var in vars){
       values[[var]] <- get(var, .GlobalEnv)
     }
     return(values)
   }
+  
+  baylorMod <- reactive({
+   if(is.null(values$dge.gsets)){
+    baylorMod <- FALSE
+   } else{
+    baylorMod <- input$baylorMods
+   }
+   baylorMod
+  })
+  
+  unsupervisedBaylorMod <- reactive({
+   baylorMod <- input$baylorModules
+   baylorMod
+  })
 
   observe({
-    if(is.null(input$file1)) return(NULL)
+   if(is.null(input$file1)) return(NULL)
     mypath<-input$file1[[fileindex()[3], 'datapath']]
     updateData(mypath, tempdir())
+  })
+  
+  observeEvent(input$uploadExampleData,{
+   withBusyIndicatorServer("uploadExampleData", {
+    setwd(old)
+    mypath <- "data/Longitudinal Macaque TB Data/bartResults.rda"
+    updateData(mypath, tempdir())
+   })
+  })
+  
+  design <- reactive({
+    if(is.null(values$design)){return(NULL)}
+    des <- values$design[[which(names(values$design) %in% c("microarray", "rnaseq"))]]
+    flow <- values$design[[which(names(values$design) %in% c("flow"))]]
+    metab <- values$design[[which(names(values$design) %in% c("metab"))]]
+    z <- list(des = des, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  sample.id <- reactive({
+    if(is.null(values$sample.id)){return(NULL)}
+    id <- values$sample.id[[which(names(values$sample.id) %in% c("microarray", "rnaseq"))]]
+    flow <- values$sample.id[[which(names(values$sample.id) %in% c("flow"))]]
+    metab <-  values$sample.id[[which(names(values$sample.id) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  subject.id <- reactive({
+    if(is.null(values$subject.id)){return(NULL)}
+    id <- values$subject.id[[which(names(values$subject.id) %in% c("microarray", "rnaseq"))]]
+    flow <- values$subject.id[[which(names(values$subject.id) %in% c("flow"))]]
+    metab <- values$subject.id[[which(names(values$subject.id) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  control.var <- reactive({
+    if(is.null(values$control.var)){return(NULL)}
+    id <- values$control.var[[which(names(values$control.var) %in% c("microarray", "rnaseq"))]]
+    flow <- values$control.var[[which(names(values$control.var) %in% c("flow"))]]
+    metab <- values$control.var[[which(names(values$control.var) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  control.val <- reactive({
+    if(is.null(values$control.val)){return(NULL)}
+    id <- values$control.val[[which(names(values$control.val) %in% c("microarray", "rnaseq"))]]
+    flow <- values$control.val[[which(names(values$control.val) %in% c("flow"))]]
+    metab <- values$control.val[[which(names(values$control.val) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  baseline.var <- reactive({
+    if(is.null(values$baseline.var)){return(NULL)}
+    id <- values$baseline.var[[which(names(values$baseline.var) %in% c("microarray", "rnaseq"))]]
+    flow <- values$baseline.var[[which(names(values$baseline.var) %in% c("flow"))]]
+    metab <- values$baseline.var[[which(names(values$baseline.var) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  baseline.val <- reactive({
+    if(is.null(values$baseline.val)){return(NULL)}
+    id <- values$baseline.val[[which(names(values$baseline.val) %in% c("microarray", "rnaseq"))]]
+    flow <- values$baseline.val[[which(names(values$baseline.val) %in% c("flow"))]]
+    metab <- values$baseline.val[[which(names(values$baseline.val) %in% c("metab"))]]
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  time.var <- reactive({
+    if(is.null(values$time.var)){
+     id <- flow <- metab <- NULL
+    } else{
+     id <- values$time.var[[which(names(values$time.var) %in% c("microarray", "rnaseq"))]]
+     flow <- values$time.var[[which(names(values$time.var) %in% c("flow"))]]
+     metab <- values$time.var[[which(names(values$time.var) %in% c("metab"))]]
+    }
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
+  })
+  
+  ctrl <- reactive({
+    if(is.null(values$control.var) || is.null(values$control.val)){return(NULL)}
+    id <- flow <- metab <- FALSE
+    if(!is.null(control.var()$id) & !is.null(control.val()$id)){
+      id <- TRUE
+    }
+    if(!is.null(control.var()$flow) & !is.null(control.val()$flow)){
+      flow <- TRUE
+    }
+    if(!is.null(control.var()$metab) & !is.null(control.val()$metab)){
+      metab <- TRUE
+    }
+    z <- list(id = id, flow = flow, metab = metab)
+    return(z)
   })
 
   output$versionbox <- renderValueBox({
     valueBox(
-      paste0("Software Version: BETA \nRelease Date: TBD"), version$version.string, icon = icon("th-list"),
+      paste0("Software Version: 1.0.0 \nRelease Date: TBD"), version$version.string, icon = icon("th-list"),
       color = "purple"
     )
   })
 
   output$version <- renderPrint({
-    writeLines("Software Version: BETA \nRelease Date: TBD")
+    writeLines("Software Version: 1.0.0 \nRelease Date: TBD")
     writeLines(version$version.string)
   })
 
   output$path <- renderText({
-    path <- values$project_name
+    path <- values$project.name
     path
   })
 
 
   ############ Design File and Summary Statistics ##############################
-  
+
   output$SumStat <- renderMenu({
     if(is.null(values$design)){
       return(strong(""))
     }
-    if(is.null(values$design) == FALSE){
+    if(is.null(design()$des) == FALSE){
       if(length(which(input$file1$name %in% grep(".html", input$file1$name, value = TRUE, fixed = TRUE))) == 0 &
          length(which(input$file1$name %in% grep(".csv", input$file1$name, value = TRUE, fixed = TRUE))) == 0 &
          length(which(input$file1$name %in% grep(".png", input$file1$name, value = TRUE, fixed = TRUE))) == 0){
@@ -307,231 +446,163 @@ shinyServer(function(input,output, session){
       }
     }
   })
-  
-  
+
+
   output$designDataTable<- renderDataTable({
-    values$design
+    design()$des
   })
-  
+
   output$downloadDesign <- downloadHandler(
-    
-    filename = function() {paste(values$project_name,'_Design','.csv', sep='')  },
+
+    filename = function() {paste(values$project.name,'_Design','.csv', sep='')  },
     content = function(file) {
-      write.csv(values$design, file, row.names = FALSE)
+      write.csv(design()$des, file, row.names = FALSE)
     }
   )
-  
+
   output$downloadSummary0 <- downloadHandler(
-    
+
     filename = function() {'SummaryStats_Table1.csv'},
     content = function(file) {
       write.csv(table_0(), file, row.names = FALSE)
     }
   )
-  
-  output$downloadSummary1 <- downloadHandler(
-    
-    filename = function() {'SummaryStats_Table2.csv'},
-    content = function(file){
-      write.csv(table_1(), file,row.names = FALSE)
-    }
-  )
-  
-  output$downloadSummary2 <- downloadHandler(
-    
-    filename = function() {'SummaryStats_Table3.csv'},
-    content = function(file) {
-      write.csv(table_2(), file,row.names = FALSE)
-    }
-  )
-  
+
   output$summaryName<-renderUI({
-    selectInput("summary_var", "Variable for summary statistics:", names(values$design),selected=values$summary_var)
+    selectizeInput("summary_var", "Main Variable for Summarization:", names(design()$des), multiple = TRUE, selected = NULL,
+                   options = list(maxItems = 1))
+  })
+
+  output$groupingVar1 <- renderUI({
+    selectizeInput("groupingVar1", "Grouping Factor 1 (e.g. responder status):", names(design()$des),multiple = TRUE, selected = NULL,
+                options = list(maxItems = 1))
   })
   
-  output$timeVar<-renderUI({
-    selectInput("time_var", "Time variable:*", values$time_var,selected=values$time_var)
+  output$groupingVar2 <-renderUI({
+    selectizeInput("groupingVar2", "Grouping Factor 2 (e.g. time):", names(design()$des), multiple = TRUE, selected = NULL,
+                options = list(maxItems = 1))
   })
-  
-  output$respVar<-renderUI({
-    selectInput("responder_var", "By variable (i.e. responder status):", names(values$design),selected=values$responder_var)
-  })
-  
-  output$patientVar<-renderUI({
-    selectInput("patient_id", "Patient ID variable:*", values$patient_id,selected=values$patient_id)
-  })
-  
-  output$summary0Text<-renderUI({
-    HTML(paste(strong("Table 1:"), "Summary statistics by", input$responder_var, "for",input$summary_var,sep=" "))
-  })
-  
-  output$summary1Text<-renderUI({
-    HTML(paste(strong("Table 2: "), "Summary statistics by Time and", input$responder_var, "for",input$summary_var,sep=" "))
-  })
-  
-  output$summary2Text <- renderUI({
-    HTML(paste(strong("Table 3: "), "Frequency of Longitudinal Profiles by", input$responder_var, sep = " "))
-  })
-  
-  data_unique <- reactive({
-    values$design[!duplicated(values$design[, values$patient_id]), ]
-  })
-  
-  table0_cont <- reactive({
-    sum0 <- aggregate(as.formula(paste(input$summary_var, "~", values$patient_id)), data = values$design, sd)
-    sum0 <- as.data.frame(sum0)
-    if(sum(sum0[[2]], na.rm = T) == 0){
-      mysummary<-function(x){y<-c(length(x),mean(x),median(x),sd(x),min(x),max(x))
-      names(y)<-c("N","Mean","Median","Sd","Min.","Max.")
-      return(y)}
-      
-      sum1<-aggregate(as.formula(paste(input$summary_var,"~",input$responder_var)), data= data_unique(), mysummary)
-      summaries<- as.data.frame(sum1[,2])
-      result<-as.data.frame(cbind(sum1[,c(1)],summaries))
-      names(result)<-c("Responder Status",colnames(summaries))
-      result
+
+  output$summaryText<-renderUI({
+    if(is.null(input$summary_var)){return(NULL)}
+    if(is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+      return(HTML(paste(strong("Table:"), "Summary Statistics for", input$summary_var, sep=" ")))
     }
-    else{
-      result <- data.frame(Warning = "Variable is time dependent. Look at table below.")
+    if(!is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+      return(HTML(paste(strong("Table:"), "Summary Statistics for", input$summary_var, "by",input$groupingVar1,sep=" ")))
+    }
+    if(!is.null(input$groupingVar1) & !is.null(input$groupingVar2)){
+      return(HTML(paste(strong("Table:"), "Summary Statistics for", input$summary_var, "by",input$groupingVar1, "and", input$groupingVar2,sep=" ")))
     }
   })
-  
-  table0_cat <- reactive({
-    sum0 <- aggregate(as.formula(paste(input$summary_var, "~", values$patient_id)), data = values$design, summary)
-    sum01 <- sum0[,2]
-    sum01[sum01 > 0] <- 1
-    sums <- apply(sum01, 1, sum)
-    check <- F
-    if(all(sums == 1)) {check <- T}
-    
-    if(check == T){
-      
-      mysummary<-function(x){y<-summary(x)
-      y<-c(length(x),y)
-      names(y)<-c("N", names(summary(x)))
-      return(y)}
-      
-      sum1<-aggregate(as.formula(paste(input$summary_var,"~",input$responder_var)), data = data_unique(), mysummary)
-      summaries<- as.data.frame(sum1[,2])
-      summaries2 = list()
-      for(i in 1:nrow(summaries[,-1])){
-        summaries2[[i]] = paste(summaries[i,-1], " ", "(", round(100*(summaries[i,-1]/summaries[i,1]), 2), "%",")", sep = "")
+
+  designForSummaryStats <- reactive({
+    design <- design()$des
+    time.var <- time.var()$id
+    for(i in 1:ncol(design)){
+     if(is.null(time.var)){
+      if(is.factor(design[,i])){
+       design[,i] <- as.character(design[,i])
       }
-      
-      summaries2 = do.call("rbind", summaries2)
-      
-      result<- cbind(as.data.frame(sum1[,1]),summaries[,1], summaries2)
-      names(result)<-c("Responder Status", "N", names(summaries[,-1]))
-      result
+     } else{
+      if(is.factor(design[,i]) || colnames(design)[i] == time.var){
+       design[,i] <- as.character(design[,i])
+      }
+     }
+      if(length(which(design[,i] == "")) > 0){
+        design[,i][which(design[,i] == "")] <- NA
+      }
+      if(is.character(design[,i])){
+        design[,i] <- as.factor(design[,i])
+      }
     }
-    
-    else{
-      result <- data.frame(Warning = "Variable is time dependent. Look at table below.")
-    }
+    return(design)
   })
   
-  table_0 <- reactive({
-    if(is.numeric(values$design[[input$summary_var]])){
-      table0_cont()
+  table0 <- reactive({
+    if(is.null(input$summary_var)){return(NULL)}
+    if(is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+      summaryFormula <- designForSummaryStats()[,input$summary_var]
     }
-    
-    else{
-      table0_cat()
+    if(!is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+      summaryFormula <- paste(input$summary_var, "~", input$groupingVar1)
+      summaryFormula2 <- paste(input$groupingVar1, "~", input$summary_var)
     }
-  })
-  
-  table_1 <- reactive({
-    if(is.numeric(values$design[[input$summary_var]])){
-      mysummary<-function(x){y <- c(length(x), mean(x), median(x), sd(x), min(x), max(x))
-      names(y)<-c("N", "Mean", "Median", "Sd", "Min.","Max.")
-      return(y)}
-      sum1<-aggregate(as.formula(paste(input$summary_var,"~",values$time_var,"+",input$responder_var)), data = values$design, mysummary)
-      summaries<- as.data.frame(sum1[,3])
-      
-      result<- data.frame(cbind(sum1[,c(1,2)],summaries))
-      names(result)<-c("Time","Responder Status",colnames(summaries))
-      result
+    if(!is.null(input$groupingVar1) & !is.null(input$groupingVar2)){
+      summaryFormula <- paste(input$summary_var, "~", input$groupingVar1, "+", input$groupingVar2)
+      summaryFormula2 <- paste(input$groupingVar1, "+", input$groupingVar2, "~", input$summary_var)
     }
-    
-    else{
-      mysummary<-function(x){y<-summary(x)
-      y<-c(length(x),y)
-      names(y)<-c("N",names(summary(x)))
-      return(y)}
-      sum1<-aggregate(as.formula(paste(input$summary_var,"~",values$time_var,"+",input$responder_var)), data= values$design, mysummary)
-      summaries<- as.data.frame(sum1[,3])
-      result<- data.frame(cbind(sum1[,c(1,2)],summaries))
-      names(result)<-c("Time","Responder Status",colnames(summaries))
-      result
+    if(is.numeric(designForSummaryStats()[,input$summary_var])){
+      mysummary<-function(x){
+        y<-c(length(x),mean(x,na.rm = TRUE),median(x, na.rm = TRUE),sd(x, na.rm = TRUE),min(x, na.rm = TRUE),max(x, na.rm = TRUE))
+        names(y)<-c("Total","Mean","Median", "Sd","Min.","Max.")
+        return(y)
+      }
+      if(is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+        sum0 <- data.frame(t(data.frame(mysummary(summaryFormula))))
+      } else{
+        sum0 <- aggregate(as.formula(summaryFormula), data = designForSummaryStats(), mysummary)
+        sum0 <- cbind(data.frame(sum0[,-ncol(sum0),drop = FALSE]),data.frame(sum0[,ncol(sum0)]))
+      }
+      sum0$Total <- as.character(sum0$Total)
+    } else{
+      mysummary<-function(x){
+        y<-summary(x, na.rm = TRUE)
+        y<-as.character(c(length(x),y))
+        names(y)<-c("Total", names(summary(x)))
+        return(y)
+      }
+      if(is.null(input$groupingVar1) & is.null(input$groupingVar2)){
+        sum0 <- t(data.frame(mysummary(summaryFormula)))
+      } else{
+        sum0 <- reshape2::dcast(summaryFormula2, data = designForSummaryStats(), fun.aggregate = length)
+        if(length(which(colnames(sum0) == "NA")) > 0){
+          colnames(sum0)[which(colnames(sum0) == "NA")] <- "Undefined"
+        }
+        if(!is.null(input$groupingVar2)){
+          colTotal <- rowSums(sum0[,-c(1,2)])
+          sum0 <- data.frame(cbind(sum0, Total = colTotal))
+          rowTotal <- c("Total","",as.character(colSums(sum0[,-c(1,2)])))
+          sum0[,1] <- as.character(sum0[,1])
+          sum0$Total <- as.character(sum0$Total)
+          sum0 <- rbind(sum0, rowTotal)
+        } else{
+          colTotal <- rowSums(sum0[,-1])
+          sum0 <- cbind(sum0, Total = colTotal)
+          rowTotal <- c("Total", as.character(colSums(sum0[,-1])))
+          sum0[,1] <- as.character(sum0[,1])
+          sum0$Total <- as.character(sum0$Total)
+          sum0 <- rbind(sum0, rowTotal)
+        }
+      }
     }
-  })
-  
-  table_2 <- reactive({
-    x<-values$design
-    names(x)[which(names(x)==values$time_var)]<-"Time"
-    names(x)[which(names(x)==input$responder_var)]<-"Responder"
-    names(x)[which(names(x)==values$patient_id)]<-"PATIENT_ID"
-    
-    timelevel<-unique(x$Time[order(x$Time)])
-    x$Time2<-factor(x$Time,levels=timelevel)
-    freqs<-aggregate(Time2~PATIENT_ID,data=x,table)
-    
-    y<-unlist(apply(as.matrix(freqs[,-1]),1,function(x){paste(timelevel[which(x>0)],collapse=",")}))
-    
-    newx<-data.frame(freqs[,1],y)
-    names(newx)<-c("PATIENT_ID","course")
-    
-    dum<-c()
-    for(i in 1:dim(newx)[1]){
-      dum[i]<-which(x$PATIENT_ID==newx$PATIENT_ID[i])[1]}
-    n1<-names(newx)
-    n2<-"Responder"
-    newx<-data.frame(newx,x$Responder[dum])
-    names(newx)<-c(n1,n2)
-    z<-aggregate(Responder~course,data=newx,table)
-    
-    if(length(z[,2]) == 1){
-      z2<- as.data.frame(z[,2,drop = F])
+    for(i in 1:ncol(sum0)){
+      if(is.numeric(sum0[,i])){
+        sum0[,i] <- round(sum0[,i], as.numeric(input$digits))
+      }
     }
-    
-    if(length(z[,2]) > 1){
-      z2 <- as.data.frame(z[,2])
-    }
-    
-    z[,1] <- as.character(z[,1])
-    sum_cols <- colSums(z2)
-    result <- rbind(data.frame(z[,1], stringsAsFactors = F), "Total")
-    
-    if(length(z[,2] == 1)){
-      result2 <- rbind(data.frame(z[,2,drop = F]), sum_cols)
-    }
-    
-    if(length(z[,2]) > 1){
-      result2 <- rbind(data.frame(z[,2]), sum_cols)
-    }
-    
-    result3<- data.frame(cbind(result,result2))
-    names(result3)<-c("Time Course",colnames(z2))
-    result3$Total <- rowSums(result3[,-1])
-    result3
+    return(sum0)
   })
   
   dig <- function(){
     as.numeric(input$digits)
   }
   
-  output$summary0 <- renderTable({
-    table_0()
-  }, digits = dig, include.rownames = FALSE)
+  output$summary0 <- renderUI({
+    if(input$sortableTable){
+      return(dataTableOutput("summaryTable"))
+    } else{
+      return(tableOutput("summaryTable2"))
+    }
+  })
   
-  output$summary1 <- renderTable({
-    table_1()
-  }, digits = dig, include.rownames = FALSE)
+  output$summaryTable <- renderDataTable({
+    table0()
+  })
   
-  output$summary2 <- renderTable({
-    table_2()
-  }, digits = 0,include.rownames = FALSE)
-  
+  output$summaryTable2 <- renderTable({
+    table0()
+  },digits = dig, include.rownames = FALSE)
   
   
   ################# PVCA ##################################
@@ -713,109 +784,100 @@ shinyServer(function(input,output, session){
   ######################### Unsupervised Side Menu ###############################
 
 output$Unsupervised <- renderMenu({
-  if(is.null(values$final_expression)){
+  if(is.null(values$exprs)){
       return(strong(""))
   }
   
-  if(is.null(values$long_base) & is.null(values$long_ctrl) & is.null(values$base_ctrl)){
+  if(is.null(values$scores.base) & is.null(values$scores.ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
                     menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"))
     )
   }
   
-  if(is.null(values$long_base) & is.null(values$long_ctrl) & !is.null(values$base_ctrl)){
+  if(!is.null(values$scores.base) || !is.null(values$scores.ctrl)){
     return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
                     menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
                     menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
     )
   }
-  
-  if((!is.null(values$long_base) | !is.null(values$long_ctrl)) & is.null(values$base_ctrl)){
-    return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
-                    menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
-    )
-  }
-  
-  if((!is.null(values$long_base) | !is.null(values$long_ctrl)) & !is.null(values$base_ctrl)){
-    return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
-                    menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
-    )
-  }
-    
-  })
+})
 
 
   #################################### Module Maps ############################
   
+  output$baylorModules <- renderUI({
+   checkboxInput("baylorModules", strong("Are plotted scores from Baylor modules?"), FALSE)
+  })
+  
   output$baseOrCtrl <- renderUI({
-    if(is.null(values$long_ctrl) & is.null(values$long_base) & is.null(values$base_ctrl)){return(NULL)}
-    if(is.null(values$long_ctrl) & is.null(values$long_base) & !is.null(values$base_ctrl)){
+    if(is.null(values$scores.ctrl) & is.null(values$scores.base)){return(NULL)}
+    if(!is.null(values$scores.ctrl) & !is.null(values$scores.base)){
       return(
-        selectInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Controls"))
+        selectizeInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Baseline", "With Respect to Controls"))
       )
     }
-    if(!is.null(values$long_ctrl) & !is.null(values$long_base)){
+    if(!is.null(values$scores.ctrl) & is.null(values$scores.base)){
       return(
-        selectInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Baseline", "With Respect to Controls"), 
-                    selected = "With Respect to Baseline")
+        selectizeInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Controls"))
       )
-    } else if(!is.null(values$long_ctrl)) {
-      return(
-        selectInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Controls"))
-      )
-    } else if(!is.null(values$long_base)) {
+    } 
+    if(is.null(values$scores.ctrl) & !is.null(values$scores.base)){
       return(
         selectInput("baseOrCtrl", "Proportions With Respect to Baseline or Controls:", choices = c("With Respect to Baseline"))
       )
-    }
+    } 
   })
   
   output$modSelection <- renderUI({
-    if(!values$baylorMod){return(NULL)}
-    selectizeInput("moduleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+    if(!unsupervisedBaylorMod()){return(NULL)}
+    selectizeInput("moduleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
                                                               "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
   })
   
   modData <- reactive({
     if(is.null(input$baseOrCtrl)){return(NULL)}
     if(input$baseOrCtrl == "With Respect to Baseline"){
-      dat <- 100*(values$long_base-1)
+      dat <- 100*(values$scores.base-1)
     } 
     if(input$baseOrCtrl == "With Respect to Controls"){
-      if(!is.null(values$base_ctrl) & is.null(values$long_ctrl)){
-        dat <- 100*(values$base_ctrl-1)
-      } else{
-        dat <- 100*(values$long_ctrl-1) 
-      }
+      dat <- 100*(values$scores.ctrl-1)
     } 
-    if(values$baylorMod){
-      if(input$moduleSelection == "First Round"){
-        dat <- dat[1:2,]
+    if(unsupervisedBaylorMod()){
+      if(input$moduleSelection == "Only Annotated"){
+        dat <- dat[grep(" ", rownames(dat)),]
+      } else if(input$moduleSelection == "First Round"){
+        #dat <- dat[1:2,]
+        dat <- dat[grep("^M1", rownames(dat)),]
       } else if(input$moduleSelection == "First Two Rounds"){
-        dat <- dat[1:5,]
+        #dat <- dat[1:5,]
+        dat <- dat[grep("^M1|^M2", rownames(dat)),]
       } else if(input$moduleSelection == "First Three Rounds"){
-        dat <- dat[1:11,]
+        #dat <- dat[1:11,]
+        dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),]
       } else if(input$moduleSelection == "First Four Rounds"){
-        dat <- dat[1:27,]
+        #dat <- dat[1:27,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),]
       } else if(input$moduleSelection == "First Five Rounds"){
-        dat <- dat[1:42,]
+        #dat <- dat[1:42,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),]
       } else if(input$moduleSelection == "First Six Rounds"){
-        dat <- dat[1:62,]
+        #dat <- dat[1:62,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),]
       } else if(input$moduleSelection == "First Seven Rounds"){
-        dat <- dat[1:97,]
+        #dat <- dat[1:97,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),]
       } else if(input$moduleSelection == "First Eight Rounds"){
-        dat <- dat[1:208,]
+        #dat <- dat[1:208,]
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),]
       } 
     }
-    des <- values$design
+    des <- design()$des
     dist <- dist(dat)
     hcl <- fastcluster::hclust(dist)
     ddm <- as.dendrogram(hcl)
     Rowv <- rowMeans(dat, na.rm = TRUE)
     ddm <- reorder(ddm, Rowv)
-    des <- des[match(colnames(dat), des[,values$sample_id], nomatch = 0),]
+    des <- des[match(colnames(dat), des[,sample.id()$id], nomatch = 0),]
     x <- list(dat = dat, ddm = ddm, des = des)
     return(x)
   })
@@ -834,11 +896,16 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
+  modResolution <- reactive({
+   params <- callModule(graphOptions, "modGraphOptions", varType = "modules")
+   return(params$resolution)
+  })
+  
   modWidth <- function(){modGraphParams()$width}
   modHeight <- function(){modGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "modSubOrder", des = reactive(values$design))
-  callModule(clusterAssociationRenderUI, "modAssociation", data = reactive(values$design))
+  callModule(subsetAndOrderRenderUI, "modSubOrder", des = reactive(design()$des))
+  callModule(clusterAssociationRenderUI, "modAssociation", data = reactive(design()$des))
   
   modRowCluster <- eventReactive(input$goMod,{
     dat<- callModule(uploadVarsRowCluster, "mod", data = reactive(modData()$dat), dendro = reactive(modData()$ddm))
@@ -861,7 +928,7 @@ output$Unsupervised <- renderMenu({
   
   modOrderedData <- eventReactive(input$goMod,{
     dat <- callModule(subsetAndOrder, "modSubOrder", des = reactive(modData()$des), data = reactive(modRowCluster()$x), 
-                      sampleAnnot = reactive(values$sample_id))
+                      sampleAnnot = reactive(sample.id()$id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -879,13 +946,14 @@ output$Unsupervised <- renderMenu({
                  detail = 'This may take a while...', value = 1,{
                    aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                              annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                             breaks = seq(-100,100,by=4))
+                             breaks=seq(-100,100,by=4))
+                   
                  }
     )
   }, width = modWidth, height = modHeight)
   
   output$downloadModPlot3Other <- downloadHandler(
-    filename = function() {paste(values$project_name, '_Longitudinal_ModuleMap','.png', sep = '')},
+    filename = function() {paste(values$project.name, '_Longitudinal_ModuleMap','.png', sep = '')},
     content = function(file){
       res <- modGraphParams()$resolution
       height <- modGraphParams()$height
@@ -893,36 +961,24 @@ output$Unsupervised <- renderMenu({
       png(file, width = (res/72)*width, height = (res/72)*height, res = res)
       print(aheatmap2(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circle_size = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
                       annheight = modGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                      breaks = seq(-100,100,by=4)))
+                      breaks=seq(-100,100,by=4)))
       dev.off()
     }
   )
   
   output$downloadModMap3Other <- downloadHandler(
-    filename = function() {paste(values$project_name,'_Longitudinal_ModuleMapData','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_Longitudinal_ModuleMapData','.csv', sep='')  },
     content = function(file) {
-      write.csv(modDataDownload(), file, row.names = TRUE)
+      x <- modOrderedData()$x
+      if(!is.na(modRowCluster()$ddm)){
+       x <- x[order.dendrogram(modRowCluster()$ddm),]
+      }
+      if(!is.na(modClusterData()$colddm)){
+       x <- x[,order.dendrogram(modClusterData()$colddm)]
+      }
+      write.csv(x, file, row.names = TRUE)
     }
   )
-  
-  modDataDownload <- reactive({
-    x <- modOrderedData()$x
-    if(is.na(modRowCluster()$ddm)){
-      if(is.na(modClusterData()$colddm)){
-        x <- x
-      } else {
-        x <- x[,order.dendrogram(modClusterData()$colddm)]
-      }
-    } else {
-      if(is.na(modClusterData()$colddm)){
-        x <- x[order.dendrogram(modRowCluster()$ddm),]
-      } else {
-        x <- x[order.dendrogram(modRowCluster()$ddm), order.dendrogram(modClusterData()$colddm)]
-        x <- x[nrow(x):1,]
-      }
-    }
-    return(x)
-  })
 
 
   output$modOptimalNumber <- renderText({
@@ -930,11 +986,11 @@ output$Unsupervised <- renderMenu({
   })
   
   output$modClusterPlot <- renderPlot({
-    barplot(modClusterData()$d, names.arg = 2:round(nrow(modOrderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index")
+    barplot(modClusterData()$d, names.arg = 2:round(nrow(modOrderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index",cex.main = 1.5, col = "#4ba9d6")
   })
 
   output$downloadClusterPlot2Other <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','Cluster_Plot_Longitudinal','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','Cluster_Plot_Longitudinal','.png', sep = '')},
     content = function(file){
       png(file, width = 800)
       print(barplot(modClusterData()$d, names.arg = 2:round(nrow(modOrderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index"))
@@ -985,70 +1041,70 @@ output$Unsupervised <- renderMenu({
     }
   })
 
-  ##################################### Probe Level Heat Map #####################################
+  ##################################### Gene Level Heat Map #####################################
 
-  heatmapdata<-reactive({
+  heatmapdata <- reactive({
     if (input$set==1){#heatmapbase1
-      if(values$hc == TRUE){
-        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val & values$design[,values$control_var] != values$control_val)]
-        ind1 <- which(colnames(values$final_expression) %in% c("PROBE_ID", "SYMBOL"))
-        ind2 <- which(colnames(values$final_expression) %in% base_sample_name)
+      if(ctrl()$id == TRUE){
+        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id & design()$des[,control.var()$id] != control.val()$id)]
+        index <- which(colnames(values$exprs) %in% base_sample_name)
       }
-      if(values$hc == FALSE){
-        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val)]
-        ind1 <- which(colnames(values$final_expression) %in% c("PROBE_ID", "SYMBOL"))
-        ind2 <- which(colnames(values$final_expression) %in% base_sample_name)
+      if(ctrl()$id == FALSE){
+        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id)]
+        index <- which(colnames(values$exprs) %in% base_sample_name)
       }
-        exp_base_sam <- values$final_expression[, c(ind1, ind2)]
-        des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)),]
-        dataManipulate(y = exp_base_sam, x = des_base_sam, 
-                       colname = "columnname", format = "Probes", 
-                       allsamples = TRUE)
-        y<-dataManipulate(y = exp_base_sam, x = des_base_sam,colname = "columnname", format = "Probes",allsamples = TRUE)
-        ddm<-values$h1b_rowdendro
-        colddm<-values$h1b_coldendro
+        exp_base_sam <- values$exprs[, index]
+        des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)),]
+        y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
+        ddm<-values$rowdend1b
     }
     if (input$set==2){#heatmapbase2
-      base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var]==values$baseline_val | values$design[,values$control_var]==values$control_val)]
-      ind1 <- which(colnames(final_expression) %in% c("PROBE_ID", "SYMBOL"))
-      ind2 <- which(colnames(final_expression) %in% base_sample_name)
-      exp_base_sam <- values$final_expression[, c(ind1, ind2)]
-      des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)), ]
-      y<-dataManipulate(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref_var=values$control_var,ref_level=values$control_val,long=FALSE,keep=TRUE,format="Probes",allsamples=FALSE)
-      ddm<-values$h2b_rowdendro
-      colddm<-values$h2b_coldendro
+      base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id]==baseline.val()$id | design()$des[,control.var()$id]==control.val()$id)]
+      index <- which(colnames(values$exprs) %in% base_sample_name)
+      exp_base_sam <- values$exprs[, index]
+      des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)), ]
+      y<-manipulateData(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref.var=control.var()$id,ref.val=control.val()$id,long=FALSE,keep.ref=TRUE)
+      ddm<-values$rowdend2b
     }
     if(input$set==3){#heatmap1
-      y<-dataManipulate(y=values$final_expression,x=values$design,colname="columnname",format="Probes",allsamples=TRUE)
-      ddm<-values$h1_rowdendro
-      colddm<-values$h1_coldendro
+      y<-manipulateData(y=values$exprs,x=design()$des,colname="columnname")
+      ddm<-values$rowdend1
     }
     if(input$set==4){#heatmap2
-      y <- dataManipulate(y = values$final_expression, x = values$design, colname = "columnname", ref_var = values$control_var, ref_level = values$control_val, long = FALSE, keep = TRUE, format = "Probes", allsamples = FALSE)
-      ddm<-values$h2_rowdendro
-      colddm<-values$h2_coldendro
+      y <- manipulateData(y = values$exprs, x = design()$des, colname = "columnname", ref.var = control.var()$id, ref.val = control.val()$id, long = FALSE, keep.ref = TRUE)
+      ddm<-values$rowdend2
     }
     if(input$set==5){#heatmap3
-      if(values$hc==TRUE){
-        des_w_controls<-values$design[which(values$design$columnname %in% colnames(values$final_expression)),]
-        des_wo_controls<-values$design[-which(values$design[,values$control_var]==values$control_val),]
-        h5index<-c(1,2,which(colnames(values$final_expression) %in% des_wo_controls$columnname))
-        y<-dataManipulate(y=values$final_expression[,h5index],x=des_wo_controls,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$id==TRUE){
+        des_w_controls<-design()$des[which(design()$des$columnname %in% colnames(values$exprs)),]
+        des_wo_controls<-design()$des[-which(design()$des[,control.var()$id]==control.val()$id),]
+        h5index<-which(colnames(values$exprs) %in% des_wo_controls$columnname)
+        y<-manipulateData(y=values$exprs[,h5index],x=des_wo_controls,colname="columnname",ref.var=baseline.var()$id,ref.val=baseline.val()$id,long=TRUE,subject.id=subject.id()$id,keep.ref=FALSE)
       }
-      if(values$hc==FALSE){
-        y<-dataManipulate(y=values$final_expression,x=values$design,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$id==FALSE){
+        y<-manipulateData(y=values$exprs,x=design()$des,colname="columnname",ref.var=baseline.var()$id,ref.val=baseline.val()$id,long=TRUE,subject.id=subject.id()$id,keep.ref=FALSE)
       }
-      ddm<-values$h3_rowdendro
-      colddm<-values$h3_coldendro
+      ddm<-values$rowdend3
     }
-    z<-list(y=y,ddm=ddm,colddm=colddm)
+    z<-list(y=y,ddm=ddm)
     return(z)
+  })
+  
+  output$plotGeneSymbols <- renderUI({
+   if(is.null(values$results.file)){return(NULL)}
+   if(all.equal(as.character(values$results.file$Transcript.ID), as.character(values$results.file$Gene.Symbol)) == TRUE){return(NULL)}
+   checkboxInput("plotGeneSymbols", "Plot Gene Symbols?", FALSE)
+  })
+  
+  output$dgePlotGeneSymbols <- renderUI({
+   if(all.equal(as.character(values$results.file$Transcript.ID), as.character(values$results.file$Gene.Symbol)) == TRUE){return(NULL)}
+   checkboxInput("dgePlotGeneSymbols", "Plot Gene Symbols?", FALSE)
   })
 
   heatmapname<-reactive({
-    if(input$set==1) heattxt<-"Baseline Median Normalized"
+    if(input$set==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method)," Normalized")
     if(input$set==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set==3) heattxt<-"All Samples Median Normalized"
+    if(input$set==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     return(heattxt)
@@ -1073,15 +1129,16 @@ output$Unsupervised <- renderMenu({
   plotWidth <- function(){graphParams()$width}
   plotHeight <- function(){graphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "unsupervisedSubOrder", des = reactive(values$design))
-  callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(values$design))
+  callModule(subsetAndOrderRenderUI, "unsupervisedSubOrder", des = reactive(design()$des))
+  callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(design()$des))
   
   rowCluster <- eventReactive(input$go, {
-    dat<- callModule(uploadVarsRowCluster, "transcripts", data = reactive(heatmapdata()$y$heatexp), dendro = reactive(heatmapdata()$ddm))
+    dat <- callModule(uploadVarsRowCluster, "transcripts", data = reactive(heatmapdata()$y$exprs.norm), dendro = reactive(heatmapdata()$ddm))
     x <- dat$x
     ddm <- dat$ddm
     labelRows <- dat$labelRows
-    y <- list(x = x, ddm = ddm, labelRows = labelRows)
+    rowAnnot <- dat$rowAnnot
+    y <- list(x = x, ddm = ddm, labelRows = labelRows, rowAnnot = rowAnnot)
     return(y)
   })
   
@@ -1096,8 +1153,8 @@ output$Unsupervised <- renderMenu({
   })
 
   orderedData <- reactive({
-    dat <- callModule(subsetAndOrder, "unsupervisedSubOrder", des = reactive(heatmapdata()$y$heatdes), data = reactive(rowCluster()$x), 
-                    sampleAnnot = reactive(values$sample_id))
+    dat <- callModule(subsetAndOrder, "unsupervisedSubOrder", des = reactive(heatmapdata()$y$design.norm), data = reactive(rowCluster()$x), 
+                    sampleAnnot = reactive(sample.id()$id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -1107,6 +1164,11 @@ output$Unsupervised <- renderMenu({
   
   maxRangeData <- eventReactive(input$go, {
     x <- callModule(maxValues, "unsupervisedMaxValues", reactive(orderedData()$x))
+    if(!is.null(values$results.file) & all.equal(values$results.file$Transcript.ID, values$results.file$Gene.Symbol) != TRUE){
+     if(input$plotGeneSymbols){
+      rownames(x) <- make.unique(as.character(values$results.file$Gene.Symbol[match(rownames(x), as.character(values$results.file$Transcript.ID))]))
+     }
+    }
     return(x)
   })
   
@@ -1120,7 +1182,7 @@ output$Unsupervised <- renderMenu({
                  detail = 'This may take a while...', value = 1,{
                    aheatmap2(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
                              annheight = graphParams()$legendSize,color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows,
-                             breaks=0)
+                             annRow = rowCluster()$rowAnnot,breaks=0)
                  }
     )
   }, width = plotWidth, height = plotHeight)
@@ -1137,7 +1199,7 @@ output$Unsupervised <- renderMenu({
   )
   
   output$downloadHeatmapData <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',heatmapname(),'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',heatmapname(),'.csv', sep='')  },
     content = function(file) {
       write.csv(heatDataDownload(), file, row.names = TRUE)
     }
@@ -1227,26 +1289,27 @@ output$Unsupervised <- renderMenu({
   ################################# DGE ###########################################
 
   output$diffge <- renderMenu({
-    if(is.null(values$results_file)){
+    if(is.null(values$results.file)){
       return(strong(""))
     }
     else{
       return(menuItem("DGE", icon = icon("area-chart"), tabName = "dge",
                       menuSubItem("Overview", tabName = "overview"),
-                      menuSubItem("Gene List Maker", tabName = "genelistmaker"),
-                      menuSubItem("Gene Search", tabName = "genesearch")))
+                      menuSubItem("Gene List Maker", tabName = "genelistmaker")))#,
+                      #menuSubItem("Gene Search", tabName = "genesearch")))
     }
   })
 
   siglist <- reactive({
-    results_file <- values$results_file
-    estimates <- results_file[,grep("Estimate of", names(results_file))]
-    pvals <- results_file[,grep("P.Value", names(results_file))]
-    fdr.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "fdr"))
-    colnames(fdr.pvals) <- gsub("P.Value","FDR.P.Value",colnames(fdr.pvals))
+    results.file <- values$results.file
+    estimates <- results.file[,grep("Estimate", names(results.file)), drop = FALSE]
+    pvals <- results.file[,grep("^P.Value", names(results.file)), drop = FALSE]
+    #fdr.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "fdr"))
+    fdr.pvals <- results.file[,grep("FDR.P.Value", names(results.file)), drop = FALSE]
+    #colnames(fdr.pvals) <- gsub("P.Value","FDR.P.Value",colnames(fdr.pvals))
     bonf.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "bonferroni"))
-    colnames(bonf.pvals) <- gsub("P.Value","Bonf.P.Value",colnames(bonf.pvals))
-    comparisons <- gsub("Estimate of ", "", colnames(estimates))
+    colnames(bonf.pvals) <- gsub("P.Value.","Bonf.P.Value.",colnames(bonf.pvals))
+    comparisons <- gsub("Estimate.", "", colnames(estimates))
     raw <- fdr <- bonf <- c()
     if(input$overviewFc){
       if(input$selectFcSign == "+"){
@@ -1286,19 +1349,19 @@ output$Unsupervised <- renderMenu({
   })
   
   index <- reactive({
-    which(names(values$results_file)== paste0("P.Value for ",input$diagnosticsComparison))
+    which(names(values$results.file)== paste0("P.Value.",input$diagnosticsComparison))
   })
   
   output$diagnosticsComparison <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
+    p.names <- gsub("P.Value.", "", p.names)
     return(selectizeInput("diagnosticsComparison", "Comparison:", p.names, p.names[1], multiple = FALSE))
   })
   
   pcomp <- reactive({
-    x <- sub("^", "P.Value for ", input$comparison)
+    x <- sub("^", "P.Value.", input$comparison)
     x
   })
 
@@ -1307,8 +1370,8 @@ output$Unsupervised <- renderMenu({
   })
 
   output$distplot<-renderPlot({
-    y<-max(hist(values$results_file[, index()])$density)
-    hist(values$results_file[,index()], freq=FALSE, xlim=c(0,1), ylim=c(0,y),main=plottitle1(),
+    y<-max(hist(values$results.file[, index()])$density)
+    hist(values$results.file[,index()], freq=FALSE, xlim=c(0,1), ylim=c(0,y),main=plottitle1(),
          xlab="Raw p-value's", ylab="Density")
     lines(c(0,1),c(1,1),lwd=2,lty=2)
   })
@@ -1316,31 +1379,31 @@ output$Unsupervised <- renderMenu({
   plotdata <-reactive({
     mymatrix<-c()
     index2<-c(0.001,0.01,1:19/20)
-    for (i in 1:21){mymatrix<-rbind(mymatrix,c(mycorrection(values$results_file[,index()],index2[i],"RAW"),mycorrection(values$results_file[,index()],index2[i],"FDR"),mycorrection(values$results_file[,index()],index2[i],"BONF")))}
+    for (i in 1:21){mymatrix<-rbind(mymatrix,c(mycorrection(values$results.file[,index()],index2[i],"RAW"),mycorrection(values$results.file[,index()],index2[i],"FDR"),mycorrection(values$results.file[,index()],index2[i],"BONF")))}
     mydata<-data.frame(cbind(index2,mymatrix))
     names(mydata)<-c("alpha","raw","fdr","bonf")
     data.frame(mydata)
   })
 
   output$numtable <-renderDataTable({
-    numtab<-cbind(plotdata()[,1],plotdata()[,2:4]*dim(values$results_file)[1])
+    numtab<-cbind(plotdata()[,1],plotdata()[,2:4]*dim(values$results.file)[1])
     names(numtab)<-c("Alpha", "Raw", "FDR", "Bonf")
     return(numtab)
   })
   
   sel_genelists <- reactive({
-    if(length(grep("All", input$comparisons_download, fixed = TRUE)) > 0){
-      nam <- names(values$results_file)
-      index <- grep("P.Value",nam,fixed=T)
+    if(length(grep("All", input$comparisons_download)) > 0){
+      nam <- names(values$results.file)
+      index <- grep("^P.Value",nam)
       p.names <- nam[index]
-      comps <- gsub("P.Value for ", "", p.names)
+      comps <- gsub("P.Value.", "", p.names)
     }
     else{
       comps <- input$comparisons_download
     }
     x.all <- list()
     for(i in 1:length(comps)){
-      x <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), comparison = reactive(comps[i]),"genes")
+      x <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(comps[i]),"genes")
       x.all[[i]] <- x
     }
     names(x.all) <- comps
@@ -1348,25 +1411,29 @@ output$Unsupervised <- renderMenu({
   })
 
   sig_ind <- reactive({
-    if(!is.null(values$modules)){
-      genes <- unlist(values$modules)
-      gsetNames <- rep(names(values$modules), times = lapply(values$modules, length))
-      modinfo <- data.frame(Module = gsetNames, PROBE_ID = genes)
+    if(!is.null(values$dge.gsets)){
+      genes <- unlist(values$dge.gsets)
+      gsetNames <- rep(names(values$dge.gsets), times = lapply(values$dge.gsets, length))
+      modinfo <- data.frame(Module = gsetNames, Transcript.ID = genes)
       if(input$dgeResults == "Modular DGE Analysis"){
-        dat <- callModule(filterOpts, "modDgeMap", data = reactive(values$results_file), data.type = "percents", geneList = reactive(modinfo))
+        dat <- callModule(filterOpts, "modDgeMap", data = reactive(values$results.file), data.type = "percents", geneList = reactive(modinfo))
       }
       if(input$dgeResults == "Gene Lists"){
-        dat <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), data.type = "percents", geneList = reactive(modinfo))
+        dat <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), data.type = "percents", geneList = reactive(modinfo))
       }
-      modnames<-unique(moduleinfo$Module)[-1]
-      modnum<-gsub("M","",modnames)
-      modvec<-as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
-      modmat<-matrix(modvec,ncol=2,byrow=T)
-      modordnum<-table(factor(moduleinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
-      mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
-      prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),]
-      prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),]
-      z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
+      if(baylorMod() == TRUE){
+        modnames <- unique(modinfo$Module)
+        modnum<-gsub("M","",modnames)
+        modvec<-as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
+        modmat<-matrix(modvec,ncol=2,byrow=T)
+        modordnum<-table(factor(modinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
+        mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
+        prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),,drop = FALSE]
+        prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),,drop = FALSE]
+        z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
+      } else{
+        z <- list(prop_matrix = dat$prop_matrix, prop_matrix2 = dat$prop_matrix2)
+      }
       return(z)
     } else{
       return(NULL)
@@ -1412,23 +1479,16 @@ output$Unsupervised <- renderMenu({
       scale_colour_gradient2(low="blue", high="red", guide="colorbar",midpoint=0, limits = c(-1,1))+ 
       theme(axis.title.x=element_blank(),axis.title.y=element_blank()) + scale_size_continuous(limits=c(1,500)) + 
       guides(size = FALSE) 
-    
-    if(is.null(values$ModulesTF) == FALSE){
-      if(values$ModulesTF == FALSE){return(NULL)}
-      if(values$ModulesTF == TRUE){return(test3)}
-    }
-    else{
-      return(test3)
-    }
+    return(test3)
   })
   
   output$moduleMap <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     plotOutput('modMap')
   })
   
   output$modmaplmmres <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     numericInput('modmaplmmres', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1)
   })
   
@@ -1436,8 +1496,13 @@ output$Unsupervised <- renderMenu({
     ModMap_Comparison()
   }, width = 700, height = 190)
   
+  output$baylorMods <- renderUI({
+   if(is.null(values$dge.gsets)){return(NULL)}
+   checkboxInput("baylorMods", strong("Are the provided gene sets baylor modules?"), FALSE)
+  })
+  
   output$downloadModMap <- renderUI({
-    if(!values$baylorMod){return(NULL)}
+    if(!baylorMod()){return(NULL)}
     downloadButton('downloadModuleMap', "Download Figure")
   })
   
@@ -1451,7 +1516,7 @@ output$Unsupervised <- renderMenu({
   )
   
   output$merge <- renderUI({
-    if(!is.null(values$dgeGeneSets)){
+    if(!is.null(values$dge.gsets)){
       return(checkboxInput("merge", "Merge gene set information", FALSE))
     } else{
       return(NULL)
@@ -1459,11 +1524,11 @@ output$Unsupervised <- renderMenu({
   })
   
   mergeDgeGeneSet <- reactive({
-    x <- reshape2::melt(values$dgeGeneSets)
+    x <- reshape2::melt(values$dge.gsets)
     x <- x[,c(2,1)]
     colnames(x) <- c("Gene.Set", "Gene")
-    if(!is.null(values$dgeGeneSetAnnotations)){
-      y <- values$dgeGeneSetAnnotations
+    if(!is.null(values$dge.annots)){
+      y <- values$dge.annots
       colnames(y) <- c("Gene.Set", "Annotation")
       x <- merge(x, y, by = "Gene.Set", all = TRUE)
     }
@@ -1471,100 +1536,104 @@ output$Unsupervised <- renderMenu({
   })
 
   output$genelisttable <-renderDataTable({
-    y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), comparison = reactive(input$comparison),"genes")
-    if(!is.null(values$dgeGeneSets)){
+    y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison),"genes")
+    if(!is.null(values$dge.gsets)){
       if(input$merge){
         x <- mergeDgeGeneSet()[!duplicated(mergeDgeGeneSet()[,2]),]
-        colnames(x)[2] <- "PROBE_ID"
-        mergeData <- merge(y, x, by = "PROBE_ID", all.x = TRUE)[,-c(2:ncol(y)),drop = FALSE]
-        mergeData <- mergeData[match(y$PROBE_ID, mergeData$PROBE_ID, nomatch = 0),]
-        mergeData$PROBE_ID <- NULL
+        colnames(x)[2] <- "Transcript.ID"
+        mergeData <- merge(y, x, by = "Transcript.ID", all.x = TRUE)[,-c(1:ncol(y)),drop = FALSE]
         y <- cbind(y[,c(1,2)],mergeData, y[,c(3:ncol(y))])
       }
     }
-    y$SYMBOL <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$SYMBOL," target = '_blank'",'>',y$SYMBOL,"</a>",sep='')
+    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
     escape = FALSE
     y
   },escape=FALSE)
 
   sig_exp_file <- reactive({
-    g <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results_file), comparison = reactive(input$comparison2),"genes")
-    g <- values$final_expression[which(values$final_expression$PROBE_ID %in% g$PROBE_ID),]
-    z = list(g = g)
+    g <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparison2),"genes")
+    e <- values$exprs[match(g$Transcript.ID, rownames(values$exprs), nomatch = 0),]
+    g <- g[match(rownames(e), g$Transcript.ID, nomatch = 0),]
+    g$Gene.Symbol <- as.character(g$Gene.Symbol)
+    g$Transcript.ID <- as.character(g$Transcript.ID)
+    if(length(which(g$Gene.Symbol == "")) > 0){
+     rows <- g$Gene.Symbol
+     rows[which(rows == "")] <- g$Transcript.ID[which(rows == "")]
+    } else{
+     rows <- g$Gene.Symbol
+    }
+    if(input$dgePlotGeneSymbols){
+     rownames(e) <- make.unique(as.character(rows))
+    }
+    z = list(g = e)
     return(z)
   })
 
   output$test1<-renderUI({
-    if(is.null(values$h3_rowdendro)){
-      if(values$hc == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2)
-      }
-      if(values$hc == FALSE){
-        try<-list("Baseline Mean Normalized" = 1)
-      }
+   if(is.null(values$rowdend3)){
+    if(ctrl()$id ==TRUE){
+     try<-list(3,4)
+     names(try) <- c(paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
     }
-    if(!is.null(values$h3_rowdendro)){
-      if(values$hc == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"=4,
-                  "All Samples Baseline Normalized"=5)
-      }
-      if(values$hc == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
-      }
+    
+    if(ctrl()$id == FALSE){
+     try<-list(3)
+     names(try) <- paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     }
-    selectInput("set1", "Select heatmap:",as.list(try))
+   }
+   
+   if(!is.null(values$rowdend3)){
+    if(ctrl()$id == TRUE){
+     try<-list(1,2,3,4,5)
+     names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                     "All Samples Healthy Normalized","All Samples Baseline Normalized")
+    }
+    if(ctrl()$id == FALSE){
+     try<-list(1,3,5)
+     names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
+    }
+   }
+   selectInput("set1", "Select heatmap:",as.list(try))
   })
 
 
   heatmapdata2 <-reactive({
     final_expression <- sig_exp_file()$g
     if (input$set1==1){#heatmapbase1
-      if(values$hc == TRUE){
-        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val & values$design[,values$control_var] != values$control_val)]
-        ind1 <- which(colnames(final_expression) %in% c("PROBE_ID", "SYMBOL"))
-        ind2 <- which(colnames(final_expression) %in% base_sample_name)
+      if(ctrl()$id == TRUE){
+        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id & design()$des[,control.var()$id] != control.val()$id)]
+        index <- which(colnames(final_expression) %in% base_sample_name)
       }
-      if(values$hc == FALSE){
-        base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var] == values$baseline_val)]
-        ind1 <- which(colnames(final_expression) %in% c("PROBE_ID", "SYMBOL"))
-        ind2 <- which(colnames(final_expression) %in% base_sample_name)
+      if(ctrl()$id == FALSE){
+        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id)]
+        index <- which(colnames(final_expression) %in% base_sample_name)
       }
-      exp_base_sam <- final_expression[, c(ind1, ind2)]
-      des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)),]
-      dataManipulate(y = exp_base_sam, x = des_base_sam, 
-                     colname = "columnname", format = "Probes", 
-                     allsamples = TRUE)
-      y<-dataManipulate(y = exp_base_sam, x = des_base_sam,colname = "columnname", format = "Probes",allsamples = TRUE)
+      exp_base_sam <- final_expression[, index]
+      des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)),]
+      y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
     }
     if (input$set1==2){#heatmapbase2
-      base_sample_name <- values$design$columnname[which(values$design[,values$baseline_var]==values$baseline_val | values$design[,values$control_var]==values$control_val)]
-      ind1 <- which(colnames(final_expression) %in% c("PROBE_ID", "SYMBOL"))
-      ind2 <- which(colnames(final_expression) %in% base_sample_name)
-      exp_base_sam <- final_expression[, c(ind1, ind2)]
-      des_base_sam <- values$design[which(values$design$columnname %in% colnames(exp_base_sam)), ]
-      y<-dataManipulate(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref_var=values$control_var,ref_level=values$control_val,long=FALSE,keep=TRUE,format="Probes",allsamples=FALSE)
+      base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id]==baseline.val()$id | design()$des[,control.var()$id]==control.val()$id)]
+      index <- which(colnames(final_expression) %in% base_sample_name)
+      exp_base_sam <- final_expression[, index]
+      des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)), ]
+      y<-manipulateData(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref.var=control.var()$id,ref.val=control.val()$id,long=FALSE,keep.ref=TRUE)
     }
     if(input$set1==3){#heatmap1
-      y<-dataManipulate(y=final_expression,x=values$design,colname="columnname",format="Probes",allsamples=TRUE)
+      y<-manipulateData(y=final_expression,x=design()$des,colname="columnname")
     }
     if(input$set1==4){#heatmap2
-      y <- dataManipulate(y = final_expression, x = values$design, colname = "columnname", ref_var = values$control_var, ref_level = values$control_val, long = FALSE, keep = TRUE, format = "Probes", allsamples = FALSE)
+      y <- manipulateData(y = final_expression, x = design()$des, colname = "columnname", ref.var = control.var()$id, ref.val = control.val()$id, long = FALSE, keep.ref = TRUE)
     }
     if(input$set1==5){#heatmap3
-      if(values$hc==TRUE){
-        des_w_controls<-values$design[which(values$design$columnname %in% colnames(final_expression)),]
-        des_wo_controls<-values$design[-which(values$design[,values$control_var]==values$control_val),]
-        h5index<-c(1,2,which(colnames(final_expression) %in% des_wo_controls$columnname))
-        y<-dataManipulate(y=final_expression[,h5index],x=des_wo_controls,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$id==TRUE){
+        des_w_controls<-design()$des[which(design()$des$columnname %in% colnames(final_expression)),]
+        des_wo_controls<-design()$des[-which(design()$des[,control.var()$id]==control.val()$id),]
+        h5index<-which(colnames(final_expression) %in% des_wo_controls$columnname)
+        y<-manipulateData(y=final_expression[,h5index],x=des_wo_controls,colname="columnname",ref.var=baseline.var()$id,ref.val=baseline.val()$id,long=TRUE,subject.id=subject.id()$id,keep.ref=FALSE)
       }
-      if(values$hc==FALSE){
-        y<-dataManipulate(y=final_expression,x=values$design,colname="columnname",ref_var=values$baseline_var,ref_level=values$baseline_val,long=TRUE,subjects=values$patient_id,keep=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$id==FALSE){
+        y<-manipulateData(y=final_expression,x=design()$des,colname="columnname",ref.var=baseline.var()$id,ref.val=baseline.val()$id,long=TRUE,subject.id=subject.id()$id,keep.ref=FALSE)
       }
     }
     z<-list(y=y)
@@ -1572,9 +1641,9 @@ output$Unsupervised <- renderMenu({
   })
 
   heatmapname1<-reactive({
-    if(input$set1==1) heattxt<-"Baseline Median Normalized"
+    if(input$set1==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method), " Normalized")
     if(input$set1==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set1==3) heattxt<-"All Samples Median Normalized"
+    if(input$set1==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set1==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set1==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     heattxt
@@ -1592,13 +1661,18 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
+  dgeResolution <- reactive({
+    params <- callModule(graphOptions, "dgeGraphOptions")
+    return(params$resolution)
+  })
+  
   dgePlotWidth <- function(){dgeGraphParams()$width}
   dgePlotHeight <- function(){dgeGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "dgeSubOrder", des = reactive(values$design))
+  callModule(subsetAndOrderRenderUI, "dgeSubOrder", des = reactive(design()$des))
   
   dgeRowCluster <- eventReactive(input$go2, {
-    x <- heatmapdata2()$y$heatexp 
+    x <- heatmapdata2()$y$exprs.norm 
     ddm <- NA
     if(input$rowCluster){
       dist <- dist(x)
@@ -1618,8 +1692,8 @@ output$Unsupervised <- renderMenu({
   })
   
   dgeOrderedData <- reactive({
-    dat <- callModule(subsetAndOrder, "dgeSubOrder", des = reactive(heatmapdata2()$y$heatdes), data = reactive(dgeRowCluster()$x), 
-                      sampleAnnot = reactive(values$sample_id))
+    dat <- callModule(subsetAndOrder, "dgeSubOrder", des = reactive(heatmapdata2()$y$design.norm), data = reactive(dgeRowCluster()$x), 
+                      sampleAnnot = reactive(sample.id()$id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -1647,21 +1721,22 @@ output$Unsupervised <- renderMenu({
     )
   }, width = dgePlotWidth, height = dgePlotHeight)
   
+  
   output$downloadHeatmap2 <- downloadHandler(
-    filename = function() {paste('Gene_Level_Heatmap','.png', sep = '')},
+    filename = function() {paste('SigVarsHeatmap','.png', sep = '')},
     content = function(file){
-      png(file, width = (plotresolution2()/72)*plot_width(), height = (plotresolution2()/72)*plot_height(), res = plotresolution2())
-      print(aheatmap2(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = input$TreeHeight, fontsize = input$FontSize, cexRow = 1.2, 
-                      annheight = Legend_Size(),color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows, 
+      png(file, width = (dgeResolution()/72)*dgeGraphParams()$width, height = (dgeResolution()/72)*dgeGraphParams()$height, res = dgeResolution())
+      print(aheatmap2(dgeMaxRangeData(),Rowv = dgeRowCluster()$ddm,Colv = dgeClusterData()$colddm, treeheight = dgeGraphParams()$treeHeight, fontsize = dgeGraphParams()$fontSize, cexRow = 1.2, 
+                      annheight = dgeGraphParams()$legendSize,color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = dgeClusterData()$colAnnot,annColors = dgeHeatColors(),labRow=dgeRowCluster()$labelRows,
                       breaks=0))
       dev.off()
     }
   )
   
   output$downloadHeatmap1 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',heatmapname(),'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',heatmapname1(),'.csv', sep='')  },
     content = function(file) {
-      write.csv(heatDataDownload(), file, row.names = TRUE)
+      write.csv(heatDataDownload2(), file, row.names = TRUE)
     }
   )
   
@@ -1685,120 +1760,47 @@ output$Unsupervised <- renderMenu({
   })
 
   output$Comparison1 <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
+    p.names <- gsub("P.Value.", "", p.names)
     selectInput("comparison", "Comparison:", p.names, p.names[1])
   })
 
   output$Comparison2 <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
+    p.names <- gsub("P.Value.", "", p.names)
     selectInput("comparison_LMM", "Comparison:", p.names, p.names[1], multiple = TRUE)
   })
   
   output$Comparison3 <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
-    selectInput("comparison2", "Comparison:", p.names, p.names[1], multiple = TRUE)
+    p.names <- gsub("P.Value.", "", p.names)
+    selectizeInput("comparison2", "Comparison:", p.names, p.names[1], multiple = FALSE)
   })
   
   output$selectComps <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
+    p.names <- gsub("P.Value.", "", p.names)
     p.names <- c("All", p.names)
     selectInput("comparisons_download", "Comparison:", p.names, p.names[1], multiple = TRUE)
   })
   
-  gensymb.search <- reactive({
-    dat <- values$results_file
-    genlist <- unique(dat$SYMBOL)
-    genlist
-  })
-
-  probe.search <- reactive({
-    dat <- values$results_file
-    selectedprobes <- dat$PROBE_ID[which(dat$SYMBOL %in% input$specgene)]
-    selectedprobes
-  })
-
-  output$specgene1 <- renderUI({
-    genlist <- gensymb.search()
-    withProgress(message = '',
-                 detail = 'Generating the Options...', value = 1,{
-                   selectizeInput("specgene", "Gene symbol selection:",
-                                  choices = genlist,
-                                  selected = genlist[1],options = list(maxOptions = 30))
-                 })
-  })
-
-  output$probeid1 <- renderUI({
-    if(is.null(input$specgene)){return(NULL)}
-    else{
-      selectedprobes <- probe.search()
-      selectizeInput("probeid", "Probe ID selection:", multiple = TRUE, selectedprobes,selected=selectedprobes[1], options = list(maxOptions = 30))
-    }
-  })
-
-  output$genTable <- renderUI({
-    actionButton("go3", "Generate table")
-  })
-
-  sgl_flat <- reactive({
-    results_file <- values$results_file
-    sgl <- results_file[grep("P.Value", names(results_file), fixed = TRUE)]
-    sgl_1 <- apply(sgl, 2, p.adjust, method = "fdr")
-    colnames(sgl_1) <- gsub("P.Value","FDR.P.Value",colnames(sgl_1))
-    sgl_2 <- apply(sgl, 2, p.adjust, method = "bonferroni")
-    colnames(sgl_2) <- gsub("P.Value","Bonf.P.Value",colnames(sgl_2))
-    sgl_flat <- data.frame(results_file, sgl_1, sgl_2)
-    sgl_flat
-  })
-
-  specgenelist <- eventReactive(input$go3,{
-    m_newsgl <- function(sss){
-      newsgl_SYMBOL <- sgl_flat()[which(sgl_flat()$SYMBOL %in% sss),][,-2]
-      comparisons <- gsub("Estimate.of.", "", colnames(newsgl_SYMBOL)[grep("Estimate", colnames(newsgl_SYMBOL), fixed = TRUE)])
-      dat <- reshape2::melt(newsgl_SYMBOL, id.vars = "PROBE_ID")
-      dat$variable <- gsub(".for.",".of.",dat$variable, fixed = TRUE)
-      splt <- as.data.frame(stringr::str_split_fixed(dat$variable, ".of.",2))
-      colnames(splt) <- c("variable", "Comparison")
-      dat <- do.call("cbind", list(PROBE_ID = as.character(dat[,1]), splt, value = dat$value))
-      newdat <- reshape2::dcast(dat, PROBE_ID + Comparison ~ variable)
-      newdat <- newdat[,c(1,2,4,7,6,5,3)]
-      return(newdat)
-    }
-    xx_0 <- m_newsgl(input$specgene)
-    xx <- xx_0[which(xx_0$PROBE_ID %in% input$probeid),]
-    xx
-  })
-
-  output$specgenetable <- renderDataTable({
-    specgenelist()
-  })
-
+  
   output$genelistgraph<-renderPlot({
     plot(plotdata()$alpha,plotdata()$raw,type="l",main="Multiple Testing Comparison Plot",col="black",xlim=c(0,1),ylim=c(0,1),xlab=expression(alpha),ylab="% of Total Probes in Gene List")
     lines(plotdata()$alpha,plotdata()$fdr,col="red",lwd=2)
     lines(plotdata()$alpha,plotdata()$bonf,col="green")
     legend("bottomright",legend=c("Raw P-value","FDR","Bonf."), lty=c(1,1,1),col=c("black","red","green") )
-    axis(4,at=1:10/10,labels=round(1:10/10*dim(values$results_file)[1],0))
+    axis(4,at=1:10/10,labels=round(1:10/10*dim(values$results.file)[1],0))
     lines(c(0,1),c(0,1),lty=2)
   })
-
-  output$downloadCG <- downloadHandler(
-    filename = function(){paste0("Gene_Search_List","_", input$specgene,"_with_selected_probes", ".csv")},
-    content = function(file){
-      write.csv(specgenelist(), file,row.names = FALSE)
-    }
-  )
 
   output$downloadSC <- downloadHandler(
     filename = function() {paste("Significance_Comparison_Overview", '_', input$alphalevel2, '.csv', sep = '') },
@@ -1810,7 +1812,7 @@ output$Unsupervised <- renderMenu({
   output$downloadData <- downloadHandler(
     filename = function() {paste(substring(pcomp(),12),'_',input$correction_method1,input$alphalevel1,'.csv', sep='')  },
     content = function(file) {
-      y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results_file), comparison = reactive(input$comparison),"genes")
+      y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison),"genes")
       write.csv(y, file,row.names = FALSE)
     }
   )
@@ -1820,8 +1822,10 @@ output$Unsupervised <- renderMenu({
     content = function(file) {
       file.names <- c()
       for(i in 1:length(sel_genelists())){
-        file.names[i] <- paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = "")
-        write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = ""), row.names = FALSE)
+        #file.names[i] <- paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = "")
+        file.names[i] <- paste(names(sel_genelists())[i],".csv", sep = "")
+        #write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = ""), row.names = FALSE)
+        write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], ".csv", sep = ""), row.names = FALSE)
       }
       zip(zipfile = file, files = file.names)
     },
@@ -1837,11 +1841,10 @@ output$Unsupervised <- renderMenu({
   output$intro <-renderText({paste("Number of probes in Gene list by method and alpha parameter.")})
   
   output$dgeTabs <- renderUI({
-    if(is.null(values$long_base) & is.null(values$long_ctrl) & is.null(values$base_ctrl)){
+    if(is.null(values$dge.gsets)){
       tabs <- lapply(1:(length(tabs.content)-1), function(i) tabPanel(tabs.content[[i]]$Title, tabs.content[[i]]$Content))
       return(do.call(tabBox, args = c(tabs, list(title = "DGE Results", width = 12, id = "dgeResults"))))
-    }
-    else {
+    } else {
       tabs <- lapply(1:length(tabs.content), function(i) tabPanel(tabs.content[[i]]$Title, tabs.content[[i]]$Content))
       return(do.call(tabBox, args = c(tabs, list(title = "DGE Results", width = 12, id = "dgeResults"))))
     }
@@ -1865,40 +1868,68 @@ output$Unsupervised <- renderMenu({
   modDgePlotHeight <- function(){modDgeGraphParams()$height}
   
   output$dgeModSelection <- renderUI({
-    if(!values$baylorMod){return(NULL)}
-    selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
-                                                              "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+    if(!baylorMod()){return(NULL)}
+    if(!is.null(values$dge.annots)){
+     return(
+      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+     )
+    } else{
+     return(
+      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+     )
+    }
   })
   
   modDgeData <- eventReactive(input$goModDge,{
-    dat <- sig_ind()$prop_matrix2
+    dat <- sig_ind()$prop_matrix2*100
+    if(!is.null(values$dge.annots)){
+     annots <- values$dge.annots[match(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], 
+                                       as.character(values$dge.annots[,1]), nomatch = 0),]
+     rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))] <- 
+      paste0(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], " ", as.character(annots[,2]))
+    }
     ddm <- NA
     colddm <- NA
     if(input$compSelect){
-      dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0)]
+      dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0), drop = FALSE]
     }
-    if(values$baylorMod){
-      if(input$dgeModuleSelection == "First Round"){
-        dat <- dat[1:2,]
-      } else if(input$dgeModuleSelection == "First Two Rounds"){
-        dat <- dat[1:5,]
-      } else if(input$dgeModuleSelection == "First Three Rounds"){
-        dat <- dat[1:11,]
-      } else if(input$dgeModuleSelection == "First Four Rounds"){
-        dat <- dat[1:27,]
-      } else if(input$dgeModuleSelection == "First Five Rounds"){
-        dat <- dat[1:42,]
-      } else if(input$dgeModuleSelection == "First Six Rounds"){
-        dat <- dat[1:62,]
-      } else if(input$dgeModuleSelection == "First Seven Rounds"){
-        dat <- dat[1:97,]
-      } else if(input$dgeModuleSelection == "First Eight Rounds"){
-        dat <- dat[1:208,]
-      } 
+    if(baylorMod()){
+     if(input$dgeModuleSelection == "Only Annotated"){
+      dat <- dat[grep(" ", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Round"){
+      #dat <- dat[1:2,]
+      dat <- dat[grep("^M1", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Two Rounds"){
+      #dat <- dat[1:5,]
+      dat <- dat[grep("^M1|^M2", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Three Rounds"){
+      #dat <- dat[1:11,]
+      dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Four Rounds"){
+      #dat <- dat[1:27,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Five Rounds"){
+      #dat <- dat[1:42,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Six Rounds"){
+      #dat <- dat[1:62,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Seven Rounds"){
+      #dat <- dat[1:97,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),, drop = FALSE]
+     } else if(input$dgeModuleSelection == "First Eight Rounds"){
+      #dat <- dat[1:208,]
+      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),, drop = FALSE]
+     } 
     }
     if(input$uploadModules){
       modNames <- read.csv(input$modSelect$datapath, header = TRUE)
       dat <- dat[which(rownames(dat) %in% modNames[,1]),]
+    }
+    if(input$LMMdeleterows){
+      dat <- dat[-which(rowSums(dat) == 0),]
     }
     if(input$modDgeCluster){
       ddm <- FALSE
@@ -1914,18 +1945,18 @@ output$Unsupervised <- renderMenu({
     withProgress(message = 'Making plot',
                  detail = 'This may take a while...', value = 1,{
                    aheatmap2(modDgeData()$dat,Rowv = modDgeData()$ddm,Colv = modDgeData()$colddm,circle_size = modDgeGraphParams()$circleSize, treeheight = modDgeGraphParams()$treeHeight, fontsize = modDgeGraphParams()$fontSize, cexRow = 1.2, 
-                             annheight = modDgeGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),breaks=0)
+                             annheight = modDgeGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),breaks=seq(-100,100,by=4))
                  }
     )
   }, width = modDgePlotWidth, height = modDgePlotHeight)
   
   output$downloadModDgeMap <- downloadHandler(
-    filename = function() {paste(values$project_name,"_LMM_ModuleMap",'_',input$correction_method1,input$alphalevel1,'.png', sep='')},
+    filename = function() {paste(values$project.name,"_LMM_ModuleMap",'_',input$correction_method1,input$alphalevel1,'.png', sep='')},
     content = function(file) {
       png(file, width = (modDgeGraphParams()$resolution/72)*modDgeGraphParams()$width, height = (modDgeGraphParams()$resolution/72)*modDgeGraphParams()$height, 
           res = modDgeGraphParams()$resolution)
       print(aheatmap2(modDgeData()$dat,Rowv = modDgeData()$ddm,Colv = modDgeData()$colddm,circle_size = modDgeGraphParams()$circleSize, treeheight = modDgeGraphParams()$treeHeight, fontsize = modDgeGraphParams()$fontSize, cexRow = 1.2, 
-                      annheight = modDgeGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),breaks=0))
+                      annheight = modDgeGraphParams()$legendSize,color = colorRampPalette(c("blue", "white", "red"))(100),breaks=seq(-100,100,by=4)))
       dev.off()
     }
   )
@@ -1933,17 +1964,17 @@ output$Unsupervised <- renderMenu({
 
   output$downloadModDgeData <- downloadHandler(
 
-    filename = function() {paste(values$project_name,"_LMM_ModuleData",'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
+    filename = function() {paste(values$project.name,"_LMM_ModuleData",'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
     content = function(file) {
       write.csv(modDgeData()$dat, file)
     }
   )
 
   output$vennComparison <- renderUI({
-    nam <- names(values$results_file)
-    index <- grep("P.Value",nam,fixed=T)
+    nam <- names(values$results.file)
+    index <- grep("^P.Value",nam)
     p.names <- nam[index]
-    p.names <- gsub("P.Value for ", "", p.names)
+    p.names <- gsub("P.Value.", "", p.names)
     selectInput("Vcomparison", "Comparison:", p.names, p.names[1], multiple = TRUE)
   })
 
@@ -1961,7 +1992,7 @@ output$Unsupervised <- renderMenu({
   venndata <- reactive({
     venn.data <- list()
     for(i in 1:length(input$Vcomparison)){
-      venn.data[[i]] <- callModule(filterOpts, "dgeVenn", reactive(values$results_file), reactive(input$Vcomparison[i]), "genes")
+      venn.data[[i]] <- callModule(filterOpts, "dgeVenn", reactive(values$results.file), reactive(input$Vcomparison[i]), "genes")
       venn.data[[i]] <- as.character(venn.data[[i]][,1])
     }
     names(venn.data) <- input$Vcomparison
@@ -2008,23 +2039,23 @@ output$Unsupervised <- renderMenu({
     comp <- input$Include
     fcomp <- list()
     for(i in 1:n){
-      fcomp[[i]] <- c(paste0("Estimate of ", input$Include[i]), paste0("Test.statistic for ", input$Include[i]),
-                      paste0("P.Value for ", input$Include[i]))
+      fcomp[[i]] <- c(paste0("Estimate.", input$Include[i]), paste0("Test.statistic.", input$Include[i]),
+                      paste0("P.Value.", input$Include[i]))
     }
     if(input$UorI == 1){
-      y <- which(values$results_file[,1] %in% Venn.intersection())
+      y <- which(values$results.file[,1] %in% Venn.intersection())
       cols <- list()
       for(i in 1:n){
-        #cols[[i]] <- grep(fcomp[i], colnames(values$results_file))
-        cols[[i]] <- match(fcomp[[i]], colnames(values$results_file))
+        #cols[[i]] <- grep(fcomp[i], colnames(values$results.file))
+        cols[[i]] <- match(fcomp[[i]], colnames(values$results.file))
       }
     }
     if(input$UorI == 2){
-      y <- which(values$results_file[,1] %in% Venn.union())
+      y <- which(values$results.file[,1] %in% Venn.union())
       cols <- list()
       for(i in 1:n){
-        #cols[[i]] <- grep(fcomp[i], colnames(values$results_file))
-        cols[[i]] <- match(fcomp[[i]], colnames(values$results_file))
+        #cols[[i]] <- grep(fcomp[i], colnames(values$results.file))
+        cols[[i]] <- match(fcomp[[i]], colnames(values$results.file))
       }
     }
     x = list()
@@ -2036,10 +2067,10 @@ output$Unsupervised <- renderMenu({
     tstats <- list()
     for(i in 1:n){
       if(i == 1){
-        x[[i]] <- values$results_file[y,c(1,2,cols[[i]])]
+        x[[i]] <- values$results.file[y,c(1,2,cols[[i]])]
       }
       if(i > 1){
-        x[[i]] <- values$results_file[y,cols[[i]]]
+        x[[i]] <- values$results.file[y,cols[[i]]]
       }
       pvals[[i]] <- grep("^P.Value", colnames(x[[i]]))
       estimates[[i]] <- grep("^Estimate", colnames(x[[i]]))
@@ -2053,7 +2084,7 @@ output$Unsupervised <- renderMenu({
     }
     for(i in 1:n){
       if(i == 1){
-        colnames(x[[i]]) = c("PROBE_ID", "SYMBOL", "Log2FC","P.Value")
+        colnames(x[[i]]) = c("Transcript.ID", "Gene.Symbol", "Log2FC","P.Value")
       }
       if(i > 1){
         colnames(x[[i]]) = c("Log2FC", "P.Value")
@@ -2062,31 +2093,31 @@ output$Unsupervised <- renderMenu({
     if(n > 1){
       for(i in 1:n){
         if(i == 1){
-          colnames(x[[i]]) = c("PROBE_ID", "SYMBOL", paste("Log2FC for", comp[i], sep = " "), paste("P.Value for", comp[i], sep =" "))
+          colnames(x[[i]]) = c("Transcript.ID", "Gene.Symbol", paste("Log2FC for", comp[i], sep = " "), paste("P.Value.", comp[i], sep =" "))
         }
         if(i > 1){
-          colnames(x[[i]]) = c(paste("Log2FC for", comp[i], sep = " "), paste("P.Value for", comp[i], sep = " "))
+          colnames(x[[i]]) = c(paste("Log2FC for", comp[i], sep = " "), paste("P.Value.", comp[i], sep = " "))
         }
       }
     }
     x = do.call("cbind", x)
     if(nrow(x) == 0){
       x <- data.frame("No Genes Present")
-      names(x) <- "PROBE_ID"
+      names(x) <- "Transcript.ID"
     }
     return(x)
   })
 
   output$vennIntersection <- renderDataTable({
     y <- genelist2()
-    y$SYMBOL <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$SYMBOL," target = '_blank'",'>',y$SYMBOL,"</a>",sep='')
+    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
     escape = FALSE
     y
   }, escape = FALSE)
 
   output$vennDiagram <- renderPlot({
     dummy <- data.frame("No Genes Present")
-    names(dummy) <- "PROBE_ID"
+    names(dummy) <- "Transcript.ID"
     if(identical(genelist2(),dummy)){return(NULL)}
     color.choices = c("blue", "green", "red", "orange","purple")
     if(length(venndata()) == 1){
@@ -2112,7 +2143,7 @@ output$Unsupervised <- renderMenu({
     filename = function() {paste0("VennDiagram_", input$UorI, '.csv')  },
     content = function(file) {
       dummy <- data.frame("No Genes Present")
-      names(dummy) <- "PROBE_ID"
+      names(dummy) <- "Transcript.ID"
       if(identical(genelist2(),dummy)){return(NULL)}
       write.csv(genelist2(), file,row.names = FALSE)
     }
@@ -2122,7 +2153,7 @@ output$Unsupervised <- renderMenu({
     filename = function() {paste0("VennDiagram_", input$UorI, '.png')  },
     content = function(file) {
       dummy <- data.frame("No Genes Present")
-      names(dummy) <- "PROBE_ID"
+      names(dummy) <- "Transcript.ID"
       if(identical(genelist2(),dummy)){return(NULL)}
       color.choices = c("blue", "green", "red", "orange","purple")
       if(length(venndata()) == 1){
@@ -2184,25 +2215,25 @@ output$Unsupervised <- renderMenu({
 ############## QUSAGE #####################
 
   output$qusage <- renderMenu({
-    if(is.null(values$qusage_results)){
+    if(is.null(values$qusage.results)){
       return(strong(""))
     }
-    if(is.null(values$qusage_results) == FALSE){
+    if(is.null(values$qusage.results) == FALSE){
       menuItem("Q-Gen", icon = icon("filter"), tabName = "qusage")
     }
   })
 
   output$genesets <- renderUI({
-    if(is.null(values$qusage_results)){
+    if(is.null(values$qusage.results)){
       return(NULL)
     }
     else{
-     if(is.list(values$qusage_results) & !is.data.frame(values$qusage_results)){
-       if(is.null(names(values$qusage_results))){
-         return(selectInput("genesets1", "Select geneset definition:", choices = c(1:length(values$qusage_results))))
+     if(is.list(values$qusage.results) & !is.data.frame(values$qusage.results)){
+       if(is.null(names(values$qusage.results))){
+         return(selectInput("genesets1", "Select geneset definition:", choices = c(1:length(values$qusage.results))))
        }
-       if(!is.null(names(values$qusage_results))){
-         return(selectInput("genesets1", "Select geneset definition:", choices = c(names(values$qusage_results))))
+       if(!is.null(names(values$qusage.results))){
+         return(selectInput("genesets1", "Select geneset definition:", choices = c(names(values$qusage.results))))
        }
      }
       else{
@@ -2212,23 +2243,23 @@ output$Unsupervised <- renderMenu({
   })
 
   master <- reactive({
-    if(is.null(values$qusage_results)){return(NULL)}
+    if(is.null(values$qusage.results)){return(NULL)}
     if(is.null(input$genesets1)){
-      qusage_results <- values$qusage_results
+      qusage_results <- values$qusage.results
     }
     if(!is.null(input$genesets1)){
-      if(!is.null(names(values$qusage_results))){
-        qusage_results <- values$qusage_results[[input$genesets1]]
+      if(!is.null(names(values$qusage.results))){
+        qusage_results <- values$qusage.results[[input$genesets1]]
       }
       else{
-        qusage_results <- values$qusage_results[[as.numeric(input$genesets1)]]
+        qusage_results <- values$qusage.results[[as.numeric(input$genesets1)]]
       }
     }
     master <- qusage_results
     colnames(master)[which(colnames(master) == "log.fold.change")] <- "Log2FC"
     unique_comp <- unique(master$Comparison)
     sub_uniquecomp <- list()
-    n = length(unique_comp)
+    n <- length(unique_comp)
     for(i in 1:n){
       sub_uniquecomp[[i]] <- which(master$Comparison == unique_comp[i])
     }
@@ -2238,38 +2269,41 @@ output$Unsupervised <- renderMenu({
     }
     bonf <- unlist(bonf)
     master$Bonf <- bonf
-    n2 <- length(values$dgeGeneSetAnnotations[,1])
-    mod.ann <- list()
-    master$Modulev2_Annotation <- ""
-    for(i in 1:n2){
-      mod.ann[[i]] <- which(master$pathway.name %in% values$dgeGeneSetAnnotations[,1][i])
+    if(!is.null(values$annots)){
+     n2 <- length(values$annots[,1])
+     mod.ann <- list()
+     master$Modulev2_Annotation <- ""
+     for(i in 1:n2){
+      mod.ann[[i]] <- which(master$pathway.name %in% values$annots[,1][i])
+     }
+     for(i in 1:n2){
+      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$annots[,2][i])
+     }
     }
-    for(i in 1:n2){
-      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$dgeGeneSetAnnotations[,2][i])
-    }
+    master$Comparison <- as.factor(master$Comparison)
     return(master)
   })
 
   mod_list <- reactive({
-    Modulelist <- values$gene_sets
+    Modulelist <- values$gene.sets
     return(Modulelist)
   })
 
 
   output$Comparisons <- renderUI({
-    selectInput("set_comp", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Comparisons1 <- renderUI({
-    selectInput("set_comp1", "Comparison(s) selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1], multiple = T)
+    selectInput("set_comp1", "Comparison(s) selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1], multiple = T)
   })
 
   output$Comparisons2 <- renderUI({
-    selectInput("set_comp2", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp2", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Comparisons3 <- renderUI({
-    selectInput("set_comp3", "Comparison selection:", choices = levels(master()$Comparison), selected = levels(master()$Comparison)[1])
+    selectInput("set_comp3", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
   })
 
   output$Module_Select1 <- renderUI({
@@ -2347,7 +2381,7 @@ output$Module_Select <- renderUI({
       master3 = master3[which(master3$Log2FC < 0),]
     }
     if(nrow(master1) > 0){
-      master_sig1 = aggregate(Comparison ~ Comparison, data = master1, FUN = table)
+      master_sig1 = aggregate(Comparison ~ Comparison, data = master1, FUN = table, drop = FALSE)
       master_sig1 = as.matrix(master_sig1)
       master_sig1 = as.data.frame(master_sig1)
       colnames(master_sig1) = sub("Comparison.", "",colnames(master_sig1))
@@ -2408,16 +2442,19 @@ output$Module_Select <- renderUI({
       colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
       master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
     }
+    if(nrow(master_sig) == 1){
+     master_sig$Comparison <- unique(master()$Comparison)
+    }
     return(master_sig)
   })
 
   individual_modselect <- reactive({
     if(is.null(master())){return(NULL)}
     master = master()[which(master()$Comparison == input$set_comp2 & master()$pathway.name == input$Mod_Select), ,drop = F]
-    lowerCI = values$lowerCI
-    upperCI = values$upperCI
-    rownames(lowerCI) <- rownames(upperCI) <- as.character(values$results_file[,1])
-    mmr_modselection <- callModule(filterOpts, "qusIndFcPlot", data = reactive(values$results_file), comparison = reactive(input$set_comp2), data.type = "genes")
+    lowerCI = values$lower.ci
+    upperCI = values$upper.ci
+    rownames(lowerCI) <- rownames(upperCI) <- as.character(values$results.file[,1])
+    mmr_modselection <- callModule(filterOpts, "qusIndFcPlot", data = reactive(values$results.file), comparison = reactive(input$set_comp2), data.type = "genes")
     mmr_modselection <- mmr_modselection[which(mmr_modselection[,1] %in% mod_list()[[input$Mod_Select]]),]
     lowerCI <- lowerCI[match(mmr_modselection[,1], rownames(lowerCI), nomatch = 0),which(colnames(lowerCI) %in% input$set_comp2)]
     upperCI <- upperCI[match(mmr_modselection[,1], rownames(upperCI), nomatch = 0),which(colnames(upperCI) %in% input$set_comp2)]
@@ -2579,10 +2616,10 @@ output$Module_Select <- renderUI({
     mmr_modselection$Pathway.Activity = master$Log2FC
     mod_plot = ggplot(data = mmr_modselection, aes(x = Index, y = Log2FC, ymin = ylow, ymax = yhigh)) + xlim(0, length(mmr_modselection$Index))
     mod_plot = mod_plot + annotate("rect", xmin = -Inf, xmax = Inf, ymin = master$low, ymax = master$up, alpha = .3, fill = "lightblue")
-    mod_plot = mod_plot + scale_x_discrete(limits = as.character(mmr_modselection$SYMBOL[mmr_modselection$Index]))
+    mod_plot = mod_plot + scale_x_discrete(limits = as.character(mmr_modselection$Gene.Symbol[mmr_modselection$Index]))
     mod_plot = mod_plot + geom_point()
     mod_plot = mod_plot + geom_errorbar(data = mmr_modselection, aes(x = Index, y = Log2FC, ymin = lowerCI, ymax = upperCI))
-    mod_plot = mod_plot + xlab("Symbol ID") + ylab("Probe Level Fold Change") + theme_bw() +
+    mod_plot = mod_plot + xlab("Gene.Symbol ID") + ylab("Probe Level Fold Change") + theme_bw() +
                theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept = 0, colour = "red", size = 1)
     mod_plot = mod_plot + geom_hline(aes(yintercept = Pathway.Activity), linetype = "dashed",colour = "black") + theme(plot.margin = unit(c(1,10,0,0), "lines"))
     mod_plot = mod_plot + annotation_custom(textGrob(label = "Pathway Activity", hjust = 0), xmin = length(mmr_modselection$Index) + 1.08,
@@ -2596,7 +2633,7 @@ output$Module_Select <- renderUI({
     if(is.null(master())){return(NULL)}
     if(is.null(individual_modselect())){return(NULL)}
     y <- individual_modselect()$mmr_modselection
-    y$SYMBOL <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$SYMBOL," target = '_blank'",'>',y$SYMBOL,"</a>",sep='')
+    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
     y <- y[,-1]
     escape = FALSE
     y
@@ -2668,7 +2705,7 @@ output$Module_Select <- renderUI({
 
   output$MultipleCompTab <- renderDataTable({
     if(is.null(master())){return(NULL)}
-    if(!is.null(values$dgeGeneSetAnnotations)){
+    if(!is.null(values$annots)){
       if(input$only_annotated){
         comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
       } else{
@@ -2685,14 +2722,14 @@ output$Module_Select <- renderUI({
 
   output$downloadSigComps <- downloadHandler(
 
-    filename = function() {paste(values$project_name,'_','Qusage_Sig_Comps_Table','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_','Qusage_Sig_Comps_Table','.csv', sep='')  },
     content = function(file) {
       write.csv(comp_overview(), file,row.names = FALSE)
     }
   )
 
   output$downloadPlot2 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','Multi_Comparisons_Plot','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','Multi_Comparisons_Plot','.png', sep = '')},
     content = function(file){
       png(file, width = (plotres1()/72)*plotWidth1(), height = (plotres1()/72)*480, res = plotres1())
       print(comp_plot1())
@@ -2701,7 +2738,7 @@ output$Module_Select <- renderUI({
   )
 
   output$downloadVenn2 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','Multi_Comparisons_Venn', '.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','Multi_Comparisons_Venn', '.png', sep = '')},
     content = function(file){
       png(file)
       grid.draw(venn.d())
@@ -2710,7 +2747,7 @@ output$Module_Select <- renderUI({
   )
 
   output$downloadTable2 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','Qusage_Data_Table_Multi_Comp','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_','Qusage_Data_Table_Multi_Comp','.csv', sep='')  },
     content = function(file) {
       comp_subset1 <- comp_subset1()[,-c(1,11)]
       comp_subset1 <- comp_subset1[,c(1,9,2,3,4,8,5,6,7)]
@@ -2719,7 +2756,7 @@ output$Module_Select <- renderUI({
   )
 
   output$downloadPlot3 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_', 'Individual_GeneSet_Plot','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_', 'Individual_GeneSet_Plot','.png', sep = '')},
     content = function(file){
       png(file, width = (plotres2()/72)*plotWidth2(), height = (plotres2()/72)*480, res = plotres2())
       grid.draw(individual_modplot())
@@ -2728,7 +2765,7 @@ output$Module_Select <- renderUI({
   )
 
   output$downloadTable3 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','Qusage_Individual_GeneSet_Data_Table','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_','Qusage_Individual_GeneSet_Data_Table','.csv', sep='')  },
     content = function(file) {
       write.csv(individual_modselect()$mmr_modselection[,-1], file,row.names = FALSE)
     }
@@ -2737,20 +2774,20 @@ output$Module_Select <- renderUI({
   ################### ROAST ############################
 
   output$roast <- renderMenu({
-    if(is.null(values$roast_results)){
+    if(is.null(values$roast.results)){
       return(strong(""))
     }
-    if(is.null(values$roast_results) == FALSE){
+    if(is.null(values$roast.results) == FALSE){
       menuItem("Roast", icon = icon("th-list"), tabName = "roast")
     }
   })
 
   output$setStat <- renderUI({
-    selectInput("setStat1", "Select gene set statistic:", choices = names(values$roast_results), selected = names(values$roast_results)[1])
+    selectInput("setStat1", "Select gene set statistic:", choices = names(values$roast.results), selected = names(values$roast.results)[1])
   })
 
   roast.overview <- reactive({
-    results <- values$roast_results[[which(names(values$roast_results) %in% input$setStat1)]]
+    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat1)]]
     Comparison <- names(results)
     Raw <- FDR <- Bonf <- c()
     for(i in 1:length(results)){
@@ -2764,7 +2801,7 @@ output$Module_Select <- renderUI({
   })
 
   roast.results <- reactive({
-    results <- values$roast_results[[which(names(values$roast_results) %in% input$setStat1)]]
+    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat1)]]
     for(i in 2:length(results)){
       results[[i]] <- results[[i]][match(rownames(results[[1]]), rownames(results[[i]]), nomatch = 0),]
     }
@@ -2781,7 +2818,7 @@ output$Module_Select <- renderUI({
   ###################FLOW PART##########################
 
   output$flow.data <- renderMenu({
-    if(is.null(values$flow_data)){
+    if(is.null(values$flow.data)){
       return(strong(""))
     }
     else{
@@ -2790,13 +2827,13 @@ output$Module_Select <- renderUI({
   })
 
   FlowMMR<-reactive({
-    x<-values$flow_results
+    x<-values$flow.results
     return(x)
   })
 
   FClist <- reactive({
-    fc_1 <- FlowMMR()[grep("P.Value", names(FlowMMR()))]
-    fc_2 <- apply(fc_1, 2, p.adjust, method = "fdr")
+    fc_1 <- FlowMMR()[grep("^P.Value", colnames(FlowMMR()))]
+    fc_2 <- FlowMMR()[grep("^FDR.P.Value", colnames(FlowMMR()))]
     fc_3 <- apply(fc_1, 2, p.adjust, method = "bonferroni")
     sumfc <- function(alpha){
       Raw <- apply(fc_1, 2, function(x) sum(x[!is.na(x)] <= alpha))
@@ -2806,7 +2843,7 @@ output$Module_Select <- renderUI({
       return(sumfc)
     }
     x <- t(sumfc(input$alphaFlow_1))
-    y <- data.frame(Comparison = substring(rownames(x), 13), x)
+    y <- data.frame(Comparison = gsub("P.Value.","",rownames(x)), x)
     rownames(y) <- NULL
     y
   })
@@ -2823,13 +2860,14 @@ output$Module_Select <- renderUI({
   )
 
   output$CompF <- renderUI({
-    nam <- names(FlowMMR())
-    p.names <- substring(nam[grep("Estimate of ", nam, fixed = TRUE)], 13)
-    selectInput("compflow", "Comparison Selection:", p.names, p.names[1])
+    nam <- colnames(FlowMMR())
+    comp.names <- nam[grep("Estimate.", nam)]
+    comp.names <- gsub("Estimate.", "", comp.names)
+    selectInput("compflow", "Comparison Selection:", comp.names, comp.names[1])
   })
 
   output$flowlisttable <-renderDataTable({
-    y <- callModule(filterOpts, "flowResultsTable", data = reactive(values$flow_results), comparison = reactive(input$compflow), data.type = "flow")
+    y <- callModule(filterOpts, "flowResultsTable", data = reactive(values$flow.results), comparison = reactive(input$compflow), data.type = "flow")
     return(y)
   })
 
@@ -2839,15 +2877,17 @@ output$Module_Select <- renderUI({
       write.csv(flowlist(), file, row.names = FALSE)
     }
   )
-
-  FlowData<-reactive({
-    x <- values$flow_data
-    subsetindex<-which(x[,which(names(x) %in% values$f_responder_var)] %in% input$FlowSub)
-    x[subsetindex,]
+  
+  FlowData <- reactive({
+    x <- values$flow.data
+    if(input$FlowTransform){
+      x[,which(colnames(x) %in% FlowMMR()$Flow.variable)] <- log2(x[,which(colnames(x) %in% FlowMMR()$Flow.variable)]+1)
+    }
+    return(x)
   })
 
   FlowDataForDownload<-reactive({  if(input$FlowVarSet=="No Flow Data"){return(NULL)}
-    x <- values$flow_data
+    x <- values$flow.data
     subsetindex<-which(x[,which(names(x) %in% values$f_responder_var)] %in% input$FlowSub)
     x[subsetindex,]
     x
@@ -2858,173 +2898,143 @@ output$Module_Select <- renderUI({
   })
 
   output$FlowSummary<-renderTable({
-    x <- values$flow_results
+    x <- values$flow.results
     x[is.na(x)]<-1
     head(x)
   }, include.rownames = FALSE)
-
-  output$flowmax<-renderUI({ numericInput("FlowMax","Max value to be plotted for time:",max(FlowData()[,which(names(FlowData()) %in% values$f_time_var)]))  })
-  output$flowmin<-renderUI({ numericInput("FlowMin","Min value to be plotted for time:",min(FlowData()[,which(names(FlowData()) %in% values$f_time_var)]))  })
-  output$flowsub<-renderUI({
-    x <- values$flow_data
-    y<-unique(as.character(x[,which(names(x) %in% values$f_responder_var)]))
-    selectInput("FlowSub","Responder levels:",y,y[1:length(y)],multiple=TRUE)
+  
+  output$flowPlotGroup1<-renderUI({
+    x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+    groups <- colnames(x)
+    selectizeInput("flowPlotGroup1","Select grouping factor1:",groups, options = list(maxItems = 1), multiple=TRUE)
+  })
+  
+  output$flowPlotGroup1Vals <- renderUI({
+   x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+   vals <- unique(x[,input$flowPlotGroup1]) 
+   selectizeInput("flowPlotGroup1Vals", "Select grouping factor1 values:",vals,multiple = TRUE)
+  })
+  
+  output$flowPlotGroup2 <- renderUI({
+    x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+    groups <- colnames(x)
+    selectizeInput("flowPlotGroup2","Select grouping factor2:",groups, options = list(maxItems = 1), multiple=TRUE)
+  })
+  
+  output$flowPlotGroup2Vals <- renderUI({
+   x <- values$flow.data[,-which(colnames(values$flow.data) %in% values$flow.results$Flow.variable)]
+   vals <- unique(x[,input$flowPlotGroup2]) 
+   selectizeInput("flowPlotGroup2Vals", "Select grouping factor2 values:",vals,multiple = TRUE)
+  })
+  
+  output$flowTrackSubjects <- renderUI({
+    if(is.null(time.var()$flow) | is.null(input$flowPlotGroup1) | is.null(input$flowPlotGroup2) | is.null(subject.id()$flow)){return(NULL)}
+    if(input$flowPlotGroup2 == time.var()$flow){
+      return(
+       checkboxInput("flowTrackSubjects", "Track subjects over time ?", FALSE)
+      )
+    } else{
+      return(NULL)
+    }
   })
 
   flowplot <- reactive({
     if(length(input$FlowPlotVars) == 0){return(NULL)}
-    if(length(input$FlowSub) == 0){return(NULL)}
-    if(is.numeric(input$FlowMin) == FALSE & is.numeric(input$FlowMax) == FALSE){return(NULL)}
-    mysummary<-function(x){
-      y<-c(mean(x),sd(x),length(x))
-      names(y)<-c("Mean","Sd","N")
-      return(y)
-    }
-    
-    mydata <- sum1 <- summaries <- result <- myplot <- list()
-    for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      }
-      sum1[[i]] <- aggregate(FlowVar~responder+time, data=mydata[[i]], mysummary)
-      summaries[[i]] <- sum1[[i]][,3]
-      result[[i]] <- as.data.frame(cbind(sum1[[i]][,c(1,2)],summaries[[i]]))
-      names(result[[i]])<-c("ResponderStatus","Time",colnames(summaries[[i]]))
-      myplot[[i]] <- ggplot(data=result[[i]],aes(x=Time, y=Mean,group=ResponderStatus,colour=ResponderStatus))+geom_point()+geom_line(aes(size=.7))+
-        geom_errorbar(aes(ymin = Mean - 2*Sd, ymax = Mean + 2*Sd,size=.7)) +
-        scale_size(range=c(.1, 2),guide=FALSE)+ xlim(input$FlowMin, input$FlowMax)+ggtitle(input$FlowPlotVars[i])
-      if(input$FlowSamples){
-        myplot[[i]] <- myplot[[i]] + geom_point(data=mydata[[i]],aes(x=time,y=FlowVar,group=subjectid,colour=responder,size=1))+
-          geom_line(data=mydata[[i]],aes(x=time,y=FlowVar,group=subjectid,colour=responder,size=.25))
-      } 
-    }
-    z <- do.call(multiplot, c(myplot, cols = 2))
-    return(z)
-  })
-
-  flowplot2 <- reactive({
-    if(length(input$FlowPlotVars) == 0){return(NULL)}
     mydata <- dummy <- index <- myplot <- list()
     for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
+     mydata[[i]] <- select(FlowData(), c(input$FlowPlotVars[i], input$flowPlotGroup1, input$flowPlotGroup2, subject.id()$flow)) %>% mutate(Flow.variable = input$FlowPlotVars[i])
+     if(!is.null(input$flowPlotGroup1Vals)){
+      mydata[[i]] <- filter_at(mydata[[i]], .vars = input$flowPlotGroup1, any_vars(. %in% input$flowPlotGroup1Vals))
+     }
+     if(!is.null(input$flowPlotGroup2Vals)){
+      mydata[[i]] <-  filter_at(mydata[[i]], .vars = input$flowPlotGroup2, any_vars(. %in% input$flowPlotGroup2Vals))
+     }
+      if(is.null(input$flowPlotGroup1)){
+        if(input$flowbox){
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x = "Flow.variable", y=input$FlowPlotVars[i])) + geom_boxplot() + ggtitle(input$FlowPlotVars[i])
+        } else{
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x = "Flow.variable", y=input$FlowPlotVars[i])) + geom_point() + ggtitle(input$FlowPlotVars[i]) 
+        }
       } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
+        if(is.null(input$flowPlotGroup2)){
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup1])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup1]),]
+            mydata[[i]][,input$flowPlotGroup1] <- as.factor(mydata[[i]][,input$flowPlotGroup1])
+          }
+        if(input$flowbox){
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup1, y=input$FlowPlotVars[i], fill=input$flowPlotGroup1)) + geom_boxplot() + 
+           ggtitle(input$FlowPlotVars[i])
+        } else{
+          myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup1, y=input$FlowPlotVars[i], colour=input$flowPlotGroup1)) + geom_point() + ggtitle(input$FlowPlotVars[i]) 
+        }
+        } else{
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup1])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup1]),]
+            mydata[[i]][,input$flowPlotGroup1] <- as.factor(mydata[[i]][,input$flowPlotGroup1])
+          }
+          if(is.numeric(mydata[[i]][,input$flowPlotGroup2])){
+            mydata[[i]] <- mydata[[i]][order(mydata[[i]][,input$flowPlotGroup2]),]
+            mydata[[i]][,input$flowPlotGroup2] <- as.factor(mydata[[i]][,input$flowPlotGroup2])
+          }
+          if(input$flowbox){
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i], fill=input$flowPlotGroup1)) + geom_boxplot() + 
+             ggtitle(input$FlowPlotVars[i])
+          } else{
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i], colour=input$flowPlotGroup1)) + geom_point() + 
+             ggtitle(input$FlowPlotVars[i]) 
+          }
+          if(time.var()$flow == input$flowPlotGroup2){
+           if(input$flowTrackSubjects){
+            subject.id <- subject.id()$flow
+            myplot[[i]] <- ggplot(data=mydata[[i]], aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i],group = subject.id,colour=input$flowPlotGroup1)) + 
+             geom_point() + geom_line(aes_string(x=input$flowPlotGroup2, y=input$FlowPlotVars[i],group=subject.id, colour = input$flowPlotGroup1)) +
+             ggtitle(input$FlowPlotVars[i])
+           }
+          }
+        }
       }
-      mydata[[i]] <- mydata[[i]][order(mydata[[i]]$time,mydata[[i]]$responder),]
-      mydata[[i]]$time<-factor(mydata[[i]]$time,ordered=T)
-      mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),ordered=T)
-      dummy[[i]] <- data.frame(do.call(rbind,strsplit(levels(mydata[[i]]$Time_Responder),"_")))
-      index[[i]] <- order(as.numeric(as.character(dummy[[i]]$X1)))
-      mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),levels(mydata[[i]]$Time_Responder)[index[[i]]])
-      if(input$flowbox){
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=FlowVar,fill=responder,colour=responder)) + geom_boxplot(position = position_dodge(width = .9)) + 
-          ggtitle(input$FlowPlotVars[i])
-      } else{
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=Time_Responder,y=FlowVar,fill=responder,colour=responder)) + geom_point() + 
-          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle(input$FlowPlotVars[i])
-      }
+      myplot[[i]] <- myplot[[i]] + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     }
-    z <- do.call(multiplot, c(myplot, cols = 2))
-    return(z)
+    plots <- do.call(multiplot, c(myplot, cols = 2))
+    return(plots)
   })
 
   output$FlowPlot<-renderPlot({
-    print(flowplot())
-  })
-
-  output$FlowPlot2<-renderPlot({
-    print(flowplot2())
-  })
-
-  FlowPlotSummary1<-reactive({
-    if(length(input$FlowPlotVars) == 0){return(NULL)}
-    if(length(input$FlowSub) == 0){return(NULL)}
-    mysummary<-function(x){
-      y<-c(mean(x),sd(x),length(x))
-      names(y)<-c("Mean","Sd","N")
-      return(y)
-    }
-    
-    mydata <- sum1 <- summaries <- result <- list()
-    FlowVariable <- c()
-    for(i in 1:length(input$FlowPlotVars)){
-      if(!input$FlowTransform){
-        mydata[[i]] <- data.frame(FlowVar=FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])],
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      } else{
-        mydata[[i]] <- data.frame(FlowVar=log2(FlowData()[,which(names(FlowData()) %in% input$FlowPlotVars[i])]),
-                                  time=FlowData()[,which(names(FlowData()) %in% values$f_time_var)],
-                                  subjectid=FlowData()[,which(names(FlowData()) %in% values$f_patient_id)],
-                                  responder=FlowData()[,which(names(FlowData()) %in% values$f_responder_var)])
-      }
-      sum1[[i]] <- aggregate(FlowVar~responder+time, data=mydata[[i]], mysummary)
-      summaries[[i]] <- sum1[[i]][,3]
-      result[[i]] <- as.data.frame(cbind(sum1[[i]][,c(1,2)],summaries[[i]]))
-      names(result[[i]])<-c("ResponderStatus","Time",colnames(summaries[[i]]))
-      FlowVariable <- c(FlowVariable, rep(input$FlowPlotVars[i], length(result[[i]][,i])))
-    }
-    
-    z <- do.call(rbind, result)
-    z <- cbind(FlowVariable, z)
-    return(z)
+    flowplot()
   })
 
   output$FlowPlotSummary<-renderDataTable({
-    FlowPlotSummary1()
+   if(length(input$FlowPlotVars) == 0){return(NULL)}
+   results <- summarizeData(data = FlowData(), numeric.vars = input$FlowPlotVars, by = c(input$flowPlotGroup1, input$flowPlotGroup2))
+   return(results)
   })
 
   output$downloadFlowResults <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',input$comparisonflow,'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',input$comparisonflow,'.csv', sep='')  },
     content = function(file) {
       write.csv(FlowMMR(), file,row.names = FALSE)
     }
   )
 
   output$downloadFlowData <- downloadHandler(
-    filename = function() {paste(values$project_name,'_FlowData','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_FlowData','.csv', sep='')  },
     content = function(file) {
       write.csv(FlowDataForDownload(), file, row.names = FALSE)
     }
   )
 
   output$downloadFlowSummaries <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',"FlowSummary_",input$FlowPlotVars[1],'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',"FlowSummary_",input$FlowPlotVars[1],'.csv', sep='')  },
     content = function(file) {
       write.csv(FlowPlotSummary1(), file, row.names = FALSE)
     }
   )
 
   output$downloadFlowPlot <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','FlowPlot1','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','FlowPlot1','.png', sep = '')},
     content = function(file){
       png(file, width = 900)
       print(flowplot())
-      dev.off()
-    }
-  )
-
-  output$downloadFlowPlot2 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','FlowPlot2','.png', sep = '')},
-    content = function(file){
-      png(file, width = 900)
-      print(flowplot2())
       dev.off()
     }
   )
@@ -3035,7 +3045,7 @@ output$Module_Select <- renderUI({
   ############### METABOLOMICS PART #################
 
   output$metab.data <- renderMenu({
-    if(is.null(values$metab_data)){
+    if(is.null(values$metab.data)){
       return(strong(""))
     }
     else{
@@ -3046,12 +3056,12 @@ output$Module_Select <- renderUI({
   })
 
   MetabMMR<-reactive({
-    x <- values$metab_results
+    x <- values$metab.results
     return(x)
   })
 
   Mlist <- reactive({
-    fc_1 <- MetabMMR()[grep("P.Value", names(MetabMMR()), fixed = TRUE)]
+    fc_1 <- MetabMMR()[grep("^P.Value", names(MetabMMR()), fixed = TRUE)]
     fc_2 <- apply(fc_1, 2, p.adjust, method = "fdr")
     fc_3 <- apply(fc_1, 2, p.adjust, method = "bonferroni")
     sumfc <- function(alpha){
@@ -3115,13 +3125,13 @@ output$Module_Select <- renderUI({
   )
 
   MetabData<-reactive({
-    x <- values$metab_data
+    x <- values$metab.data
     subsetindex<-which(x[,which(names(x) %in% values$m_responder_var)] %in% input$MetabSub)
     x[subsetindex,]
   })
 
   MetabDataForDownload<-reactive({
-    x <- values$metab_data
+    x <- values$metab.data
     subsetindex<-which(x[,which(names(x) %in% values$m_responder_var)] %in% input$MetabSub)
     x[subsetindex,]
     x
@@ -3140,14 +3150,14 @@ output$Module_Select <- renderUI({
   })
 
   output$pcaAnnotM <- renderUI({
-    dat <- values$metab_data
+    dat <- values$metab.data
     num <- sapply(dat, is.numeric)
     groups <- dat[,which(num == FALSE),drop = FALSE]
     selectInput("pcaAnnot2M", "Select grouping factor:", colnames(groups), selected = colnames(groups)[which(colnames(groups) %in% values$m_responder_var)])
   })
 
   output$pcaAnnotValsM <- renderUI({
-    dat <- values$metab_data
+    dat <- values$metab.data
     num <- sapply(dat, is.numeric)
     groups <- dat[,which(num == FALSE),drop = FALSE]
     values <- unique(groups[,input$pcaAnnot2M])
@@ -3155,21 +3165,21 @@ output$Module_Select <- renderUI({
   })
 
   output$pcaBlockingM <- renderUI({
-    if(is.null(values$m_time_var)){return(NULL)}
-    dat <- values$metab_data
-    selectInput("pcaBlockM", "PCA by time:", c("All timepoints", unique(dat[,values$m_time_var])), selected = "All timepoints")
+    if(is.null(time.var()$metab)){return(NULL)}
+    dat <- values$metab.data
+    selectInput("pcaBlockM", "PCA by time:", c("All timepoints", unique(dat[,time.var()$metab])), selected = "All timepoints")
   })
 
   PCAM <- reactive({
-    dat <- values$metab_data
-    if(!is.null(values$m_time_var)){
+    dat <- values$metab.data
+    if(!is.null(time.var()$metab)){
       if(input$pcaBlockM == "All timepoints"){
         metabDat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM),which(colnames(dat) %in% as.character(MetabMMR()$Metab.variable))]
         dat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM),]
       }
       else{
-        metabDat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM & dat[,values$m_time_var] %in% input$pcaBlockM),which(colnames(dat) %in% as.character(MetabMMR()$Metab.variable))]
-        dat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM & dat[,values$m_time_var] %in% input$pcaBlockM),]
+        metabDat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM & dat[,time.var()$metab] %in% input$pcaBlockM),which(colnames(dat) %in% as.character(MetabMMR()$Metab.variable))]
+        dat <- dat[which(dat[,input$pcaAnnot2M] %in% input$pcaAnnValsM & dat[,time.var()$metab] %in% input$pcaBlockM),]
       }
     }
     else{
@@ -3242,15 +3252,15 @@ output$Module_Select <- renderUI({
   })
 
   output$MetabSummary<-renderTable({
-    x <- values$metab_results
+    x <- values$metab.results
     x[is.na(x)]<-1
     head(x)
   }, include.rownames = FALSE)
 
-  output$metabmax<-renderUI({ numericInput("MetabMax","Max value to be plotted for time:",max(MetabData()[,which(names(MetabData()) %in% values$m_time_var)]))  })
-  output$metabmin<-renderUI({ numericInput("MetabMin","Min value to be plotted for time:",min(MetabData()[,which(names(MetabData()) %in% values$m_time_var)]))  })
+  output$metabmax<-renderUI({ numericInput("MetabMax","Max value to be plotted for time:",max(MetabData()[,which(names(MetabData()) %in% time.var()$metab)]))  })
+  output$metabmin<-renderUI({ numericInput("MetabMin","Min value to be plotted for time:",min(MetabData()[,which(names(MetabData()) %in% time.var()$metab)]))  })
   output$metabsub<-renderUI({
-    x<-values$metab_data
+    x<-values$metab.data
     y<-unique(as.character(x[,which(names(x) %in% values$m_responder_var)]))
     selectInput("MetabSub","Responder levels:",y,y[1:length(y)],multiple=TRUE)
   })
@@ -3270,13 +3280,13 @@ output$Module_Select <- renderUI({
     for(i in 1:length(input$MetabPlotVars)){
       if(!input$MetabTransform){
         mydata[[i]] <- data.frame(MetabVar=MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])],
-                                  time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                  subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                  time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                  subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                   responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       } else{
         mydata[[i]] <- data.frame(MetabVar=log2(MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])]),
-                                  time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                  subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                  time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                  subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                   responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       }
       sum1[[i]] <- aggregate(MetabVar~responder+time, data=mydata[[i]], mysummary)
@@ -3301,13 +3311,13 @@ output$Module_Select <- renderUI({
     for(i in 1:length(input$MetabPlotVars)){
       if(!input$MetabTransform){
         mydata[[i]] <- data.frame(MetabVar=MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])],
-                                          time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                          subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                          time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                          subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                           responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       } else{
         mydata[[i]] <- data.frame(MetabVar=log2(MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])]),
-                                  time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                  subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                  time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                  subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                   responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       }
       mydata[[i]] <- mydata[[i]][order(mydata[[i]]$time,mydata[[i]]$responder),]
@@ -3317,7 +3327,7 @@ output$Module_Select <- renderUI({
       index[[i]] <- order(as.numeric(as.character(dummy[[i]]$X1)))
       mydata[[i]]$Time_Responder<-factor(paste(mydata[[i]]$time,mydata[[i]]$responder,sep="_"),levels(mydata[[i]]$Time_Responder)[index[[i]]])
       if(input$metabbox){
-        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=MetabVar,fill=responder,colour=responder)) + geom_boxplot(position = position_dodge(width = .9)) + 
+        myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=time,y=MetabVar,fill=responder,colour=responder)) + geom_boxplot() + 
           ggtitle(input$MetabPlotVars[i])
       } else{
         myplot[[i]] <- ggplot(data=mydata[[i]],aes(x=Time_Responder,y=MetabVar,fill=responder,colour=responder)) + geom_point() + 
@@ -3351,13 +3361,13 @@ output$Module_Select <- renderUI({
     for(i in 1:length(input$MetabPlotVars)){
       if(!input$MetabTransform){
         mydata[[i]] <- data.frame(MetabVar=MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])],
-                                  time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                  subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                  time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                  subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                   responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       } else{
         mydata[[i]] <- data.frame(MetabVar=log2(MetabData()[,which(names(MetabData()) %in% input$MetabPlotVars[i])]),
-                                  time=MetabData()[,which(names(MetabData()) %in% values$m_time_var)],
-                                  subjectid=MetabData()[,which(names(MetabData()) %in% values$m_patient_id)],
+                                  time=MetabData()[,which(names(MetabData()) %in% time.var()$metab)],
+                                  subjectid=MetabData()[,which(names(MetabData()) %in% subject.id()$metab)],
                                   responder=MetabData()[,which(names(MetabData()) %in% values$m_responder_var)])
       }
       sum1[[i]] <- aggregate(MetabVar~responder+time, data=mydata[[i]], mysummary)
@@ -3374,87 +3384,85 @@ output$Module_Select <- renderUI({
 
   output$normMetab<-renderUI({
 
-    if(is.null(values$h3_rowdendro)){
-      if(values$m_hc == TRUE){
-        try<-list("Baseline Median Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2)
+    if(is.null(values$rowdend3)){
+      if(ctrl()$metab == TRUE){
+        try<-list(1,2)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized")
       }
 
-      if(values$m_hc == FALSE){
-        try<-list("Baseline Median Normalized" = 1)
+      if(ctrl()$metab == FALSE){
+        try<-list(1)
+        names(try) <- paste0("Baseline ",firstUp(values$norm.method), " Normalized")
       }
     }
 
-    if(!is.null(values$h3_rowdendro)){
-      if(values$m_hc == TRUE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "Baseline Healthy Normalized" = 2,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Healthy Normalized"=4,
-                  "All Samples Baseline Normalized"=5)
+    if(!is.null(values$rowdend3)){
+      if(ctrl()$metab == TRUE){
+        try<-list(1,2,3,4,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",firstUp(values$norm.method), " Normalized"),
+                        "All Samples Healthy Normalized","All Samples Baseline Normalized")
       }
 
-      if(values$m_hc == FALSE){
-        try<-list("Baseline Mean Normalized" = 1,
-                  "All Samples Mean Normalized" = 3,
-                  "All Samples Baseline Normalized"=5)
+      if(ctrl()$metab == FALSE){
+        try<-list(1,3,5)
+        names(try) <- c(paste0("Baseline ",firstUp(values$norm.method), " Normalized"),paste0("All Samples ",firstUp(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
       }
     }
 
     selectInput("set3", "Select heatmap:",as.list(try))
   })
 
-  design <- reactive({
-    values$m_design
-  })
-
   heatmapdatam <-reactive({
-    design <- values$m_design
-    metabdat <- values$metab_data
-    metabvars <- as.character(values$metab_results$Metab.variable)
-    final_expression = metabdat[,which(colnames(metabdat) %in% metabvars)]
+    design <- design()$metab
+    metabdat <- values$metab.data
+    metabvars <- as.character(values$metab.results$Metab.variable)
+    final_expression <- metabdat[,which(colnames(metabdat) %in% metabvars)]
     final_expression <- final_expression[,match(metabvars, colnames(final_expression), nomatch = 0)]
-    rownames(final_expression) <- as.character(design$columnname)
+    rownames(final_expression) <- as.character(design()$metab$columnname)
     final_expression <- as.data.frame(t(final_expression))
     metabvars <- metabvars[match(rownames(final_expression), metabvars,nomatch = 0)]
-    PROBE_ID <- as.character(metabvars)
-    SYMBOL <- as.character(metabvars)
+    #Transcript.ID <- as.character(metabvars)
+    #Gene.Symbol <- as.character(metabvars)
     final_expression <- log2(final_expression)
-    final_expression <- do.call("cbind", list(PROBE_ID = PROBE_ID,SYMBOL=SYMBOL, final_expression))
-    final_expression <- final_expression[which(final_expression$PROBE_ID %in% metablist()[,1]),]
+    #final_expression <- do.call("cbind", list(Transcript.ID = Transcript.ID,Gene.Symbol=Gene.Symbol, final_expression))
+    final_expression <- final_expression[which(rownames(final_expression) %in% metablist()[,1]),]
 
     if (input$set3==1){#heatmapbase1
-      base_sample_name=design$columnname[design[,m_baseline_var]==values$m_baseline_val]
-      ind1<-which(colnames(final_expression)%in%c("PROBE_ID","SYMBOL"))
-      ind2<-which(colnames(final_expression)%in%base_sample_name)
-      exp_base_sam=final_expression[,c(ind1,ind2)]
-      des_base_sam=design[which(design$columnname%in%colnames(exp_base_sam)),]
-      y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$m_baseline_val,longitudinal=FALSE,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+      if(ctrl()$metab == TRUE){
+        base_sample_name <- design()$metab$columnname[which(design()$metab[,baseline.var()$metab] == baseline.val()$metab & design()$metab[,control.var()$metab] != values$m_control_val)]
+        index <- which(colnames(final_expression) %in% base_sample_name)
+      }
+      if(ctrl()$metab == FALSE){
+        base_sample_name <- design()$metab$columnname[which(design()$metab[,baseline.var()$metab] == baseline.val()$metab)]
+        index <- which(colnames(final_expression) %in% base_sample_name)
+      }
+      exp_base_sam=final_expression[,index]
+      des_base_sam=design()$metab[which(design()$metab$columnname%in%colnames(exp_base_sam)),]
+      y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
     }
-
     if (input$set3==2){
-      base_sample_name=design$columnname[design[,m_baseline_var]==values$m_baseline_val]
-      ind1<-which(colnames(final_expression)%in%c("PROBE_ID","SYMBOL"))
-      ind2<-which(colnames(final_expression)%in%base_sample_name)
-      exp_base_sam=final_expression[,c(ind1,ind2)]
-      des_base_sam=design[which(design$columnname%in%colnames(exp_base_sam)),]
-      y<-data.manipulate(exp=exp_base_sam,des=des_base_sam,values$m_control_var,values$m_control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+      base_sample_name <- design()$metab$columnname[which(design()$metab[,baseline.var()$metab]==baseline.val()$metab | design()$metab[,control.var()$metab]==values$m_control_val)]
+      index <- which(colnames(final_expression) %in% base_sample_name)
+      exp_base_sam <- final_expression[, index]
+      des_base_sam <- design()$metab[which(design()$metab$columnname %in% colnames(exp_base_sam)), ]
+      y<-manipulateData(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref.var=control.var()$metab,ref.val=values$m_control_val,long=FALSE,keep.ref=TRUE)
     }
     if (input$set3==3){
-      y<-data.manipulate(exp=final_expression,des=design[which(design$columnname %in% colnames(final_expression)),],values$m_baseline_var,values$m_baseline_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=TRUE)
+      y<-manipulateData(y=final_expression,x=design()$metab,colname="columnname")
     }
     if (input$set3==4){
-      y<-data.manipulate(exp=final_expression,des=design[which(design$columnname %in% colnames(final_expression)),],values$m_control_var,values$m_control_val,longitudinal=FALSE,subjects,lg2=FALSE,keepbase=TRUE,format="Probes",allsamples=FALSE)
+      y <- manipulateData(y = final_expression, x = design()$metab, colname = "columnname", ref.var = control.var()$metab, ref.val = values$m_control_val, long = FALSE, keep.ref = TRUE)
     }
     if (input$set3==5){#heatmap3
-      if(values$m_hc==TRUE){
-        des_w_controls<-design[which(design$columnname %in% colnames(final_expression)),]
-        des_wo_controls<-design[-which(design[,values$m_control_var]==values$m_control_val),]
-        h5index<-c(1,2,which(colnames(final_expression) %in% des_wo_controls$columnname))
-        y<-data.manipulate(exp=final_expression[,h5index],des=des_wo_controls,values$m_baseline_var,values$m_baseline_val,longitudinal=TRUE,subjects=values$m_patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$metab==TRUE){
+        des_w_controls<-design()$metab[which(design()$metab$columnname %in% colnames(final_expression)),]
+        des_wo_controls<-design()$metab[-which(design()$metab[,control.var()$metab]==values$m_control_val),]
+        h5index<-which(colnames(final_expression) %in% des_wo_controls$columnname)
+        y<-manipulateData(y=final_expression[,h5index],x=des_wo_controls,colname="columnname",ref.var=baseline.var()$metab,ref.val=baseline.val()$metab,long=TRUE,subject.id=subject.id()$metab,keep.ref=FALSE)
       }
-      if(values$m_hc==FALSE){
-        y<-data.manipulate(exp=final_expression,des=design[which(design$columnname %in% colnames(final_expression)),],values$m_baseline_var,values$m_baseline_val,longitudinal=TRUE,subjects=values$m_patient_id,lg2=FALSE,keepbase=FALSE,format="Probes",allsamples=FALSE)
+      if(ctrl()$metab==FALSE){
+        y<-manipulateData(y=final_expression,x=design()$metab,colname="columnname",ref.var=baseline.var()$metab,ref.val=baseline.val()$metab,long=TRUE,subject.id=subject.id()$metab,keep.ref=FALSE)
+        
       }
     }
     z<-list(y=y)
@@ -3462,9 +3470,9 @@ output$Module_Select <- renderUI({
   })
 
   heatmapnamem<-reactive({
-    if(input$set3==1) heattxt<-"Baseline Median Normalized"
+    if(input$set3==1) heattxt<-paste0("Baseline ",firstUp(values$norm.method), " Normalized")
     if(input$set3==2) heattxt<-"Baseline Healthy Normalized"
-    if(input$set3==3) heattxt<-"All Samples Median Normalized"
+    if(input$set3==3) heattxt<-paste0("All Samples ",firstUp(values$norm.method), " Normalized")
     if(input$set3==4) heattxt<-"All Samples Healthy Normalized"
     if(input$set3==5) heattxt<-"All Samples Normalized to each Subjects Baseline"
     heattxt
@@ -3485,10 +3493,10 @@ output$Module_Select <- renderUI({
   metabPlotWidth <- function(){metabGraphParams()$width}
   metabPlotHeight <- function(){metabGraphParams()$height}
   
-  callModule(subsetAndOrderRenderUI, "metabSubOrder", des = reactive(values$m_design))
+  callModule(subsetAndOrderRenderUI, "metabSubOrder", des = reactive(design()$metab))
   
   metabRowCluster <- eventReactive(input$go4, {
-    x <- heatmapdatam()$y$heatexp 
+    x <- heatmapdatam()$y$exprs.norm
     ddm <- NA
     if(input$metabRowCluster){
       dist <- dist(x)
@@ -3508,8 +3516,8 @@ output$Module_Select <- renderUI({
   })
   
   metabOrderedData <- reactive({
-    dat <- callModule(subsetAndOrder, "metabSubOrder", des = reactive(heatmapdatam()$y$heatdes), data = reactive(metabRowCluster()$x), 
-                      sampleAnnot = reactive(values$m_sample_id))
+    dat <- callModule(subsetAndOrder, "metabSubOrder", des = reactive(heatmapdatam()$y$design.norm), data = reactive(metabRowCluster()$x), 
+                      sampleAnnot = reactive(sample.id()$metab))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -3554,45 +3562,45 @@ output$Module_Select <- renderUI({
   )
 
   heatmap_download2M <- reactive({
-    heatmapdata <- cbind(expression_matrix2()$symb, expression_matrix2()$y$heatexp)
+    heatmapdata <- cbind(expression_matrix2()$symb, expression_matrix2()$y$exprs.norm)
     heatmapdata <- cbind(expression_matrix2()$probeids, heatmapdata)
     return(heatmapdata)
   })
 
-  output$downloadHeatmap1 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',heatmapname1(),'.csv', sep='')  },
-    content = function(file) {
-      write.csv(heatmap_download2M(), file, row.names = FALSE)
-    }
-  )
+  #output$downloadHeatmap1 <- downloadHandler(
+    #filename = function() {paste(values$project.name,'_',heatmapname1(),'.csv', sep='')  },
+    #content = function(file) {
+      #write.csv(heatmap_download2M(), file, row.names = FALSE)
+    #}
+  #)
 
   output$MetabPlotSummary<-renderDataTable({
     MetabPlotSummary1()
   })
 
   output$downloadMetabResults <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',input$comparisonmetab,'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',input$comparisonmetab,'.csv', sep='')  },
     content = function(file) {
       write.csv(MetabResult(), file,row.names = FALSE)
     }
   )
 
   output$downloadMetabData <- downloadHandler(
-    filename = function() {paste(values$project_name,'_MetabData','.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_MetabData','.csv', sep='')  },
     content = function(file) {
       write.csv(MetabDataForDownload(), file, row.names = FALSE)
     }
   )
 
   output$downloadMetabSummaries <- downloadHandler(
-    filename = function() {paste(values$project_name,'_',"MetabSummary_",input$MetabPlotVars[1],'.csv', sep='')  },
+    filename = function() {paste(values$project.name,'_',"MetabSummary_",input$MetabPlotVars[1],'.csv', sep='')  },
     content = function(file) {
       write.csv(MetabPlotSummary1(), file, row.names = FALSE)
     }
   )
 
   output$downloadMetabPlot <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','MetabPlot1','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','MetabPlot1','.png', sep = '')},
     content = function(file){
       png(file, width = 900)
       print(metabplot())
@@ -3601,7 +3609,7 @@ output$Module_Select <- renderUI({
   )
 
   output$downloadMetabPlot2 <- downloadHandler(
-    filename = function() {paste(values$project_name,'_','MetabPlot2','.png', sep = '')},
+    filename = function() {paste(values$project.name,'_','MetabPlot2','.png', sep = '')},
     content = function(file){
       png(file, width = 900)
       print(metabplot2())
@@ -3614,7 +3622,7 @@ output$Module_Select <- renderUI({
   ###############Correlations########################
   
   output$correlations <- renderMenu({
-    if(is.null(values$correlations)){
+    if(is.null(values$corrs)){
       return(strong(""))
     }
     else{
@@ -3623,29 +3631,29 @@ output$Module_Select <- renderUI({
   })
   
   output$TypeVariable <- renderUI({
-    selectInput("TypeVariable1", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable1", "Choose Correlation Data:", choices = values$corr.names, selected = values$corr.names[1])
   })
   
   output$TypeVariable2 <- renderUI({
-    selectInput("TypeVariable3", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable3", "Choose Correlation Data:", choices = values$corr.names, selected = values$corr.names[1])
   })
   
   output$TypeVariable4 <- renderUI({
-    selectInput("TypeVariable5", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable5", "Choose Correlation Data:", choices = values$corr.names, selected = values$corr.names[1])
   })
   
   output$TypeVariable6 <- renderUI({
-    selectInput("TypeVariable7", "Choose Correlation Data:", choices = values$correlation_names, selected = values$correlation_names[1])
+    selectInput("TypeVariable7", "Choose Correlation Data:", choices = values$corr.names, selected = values$corr.names[1])
   })
   
   output$var_switch <- renderUI({
-    checkboxInput("var_switch", strong(paste0("Change Figure Rows to ", values$x_var[which(values$correlation_names == input$TypeVariable1)])), value = FALSE)
+    checkboxInput("var_switch", strong(paste0("Change Figure Rows to ", values$x.var[which(values$corr.names == input$TypeVariable1)])), value = FALSE)
   })
   
   corrResultsOverview <- reactive({
     correlations <- results <- Raw <- FDR <- Bonf <- list()
-    for(i in 1:length(values$correlations)){
-      corrs <- data.table::as.data.table(values$correlations[[i]][,c(2,1,3:ncol(values$correlations[[i]]))])
+    for(i in 1:length(values$corrs)){
+      corrs <- data.table::as.data.table(values$corrs[[i]][,c(2,1,3:ncol(values$corrs[[i]]))])
       corrs$FDR <- 1
       corrs$Bonf <- 1
       corrs[,FDR := p.adjust(Raw.P.Value, method = "fdr"), by = c(names(corrs)[c(2,3)])]
@@ -3653,8 +3661,8 @@ output$Module_Select <- renderUI({
       corrs <- as.data.frame(corrs)
       corrs <- corrs[,c(2,1,3:ncol(corrs))]
       comps <- raw <- fdr <- bonf <- c()
-      for(j in 1:length(unique(values$correlations[[i]][,3]))){
-        comps[j] <- paste0(values$correlation_names[i],"_",as.character(unique(values$correlations[[i]][,3])[j]))
+      for(j in 1:length(unique(values$corrs[[i]][,3]))){
+        comps[j] <- paste0(values$corr.names[i],"_",as.character(unique(values$corrs[[i]][,3])[j]))
         corrs.sub <- corrs[corrs[,3] == unique(corrs[,3])[j],]
         if(input$overviewCorrVal){
           if(input$selectCorrSign == "+"){
@@ -3685,14 +3693,14 @@ output$Module_Select <- renderUI({
   })
   
   output$downloadOverviewCorrTable <- downloadHandler(
-    filename = function() {paste(values$project_name, "_", "Correlation_Results_Overview_Table.csv")},
+    filename = function() {paste(values$project.name, "_", "Correlation_Results_Overview_Table.csv")},
     content = function(file) {
       write.csv(corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),], file, row.names = FALSE)
     }
   )
   
   output$subsetcorr <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -3704,7 +3712,7 @@ output$Module_Select <- renderUI({
   })
   
   output$WithVariable1 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable1)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -3713,7 +3721,7 @@ output$Module_Select <- renderUI({
   })
   
   output$WithVariable2 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable3)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable3)]]
     if(input$var_switch2 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -3722,20 +3730,20 @@ output$Module_Select <- renderUI({
   })
   
   output$corr_Variable <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    selectInput("corr_Variable2", paste("Choose", values$y_var[which(values$correlation_names == input$TypeVariable7)], "Variable:", sep = " "), choices = as.character(gtools::mixedsort(unique(correlations$Variable))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable7)]]
+    selectInput("corr_Variable2", paste("Choose", values$y.var[which(values$corr.names == input$TypeVariable7)], "Variable:", sep = " "), choices = as.character(gtools::mixedsort(unique(correlations$Variable))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
   
   output$WithVariable4 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    selectInput("WithVariable5", paste("Choose ", values$x_var[which(values$correlation_names == input$TypeVariable7)], " Variable:", sep = ""), choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable7)]]
+    selectInput("WithVariable5", paste("Choose ", values$x.var[which(values$corr.names == input$TypeVariable7)], " Variable:", sep = ""), choices = as.character(gtools::mixedsort(unique(correlations$With))), selected = as.character(gtools::mixedsort(unique(correlations$With)))[1])
   })
   
   output$uploadmod1 <- renderUI({
     if(input$var_switch == FALSE){
-      return(checkboxInput("uploadmod", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
+      return(checkboxInput("uploadmod", strong(paste("Upload ",values$y.var[which(values$corr.names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
     } else{
-      return(checkboxInput("uploadmod", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
+      return(checkboxInput("uploadmod", strong(paste("Upload ",values$x.var[which(values$corr.names == input$TypeVariable1)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
   
@@ -3750,9 +3758,9 @@ output$Module_Select <- renderUI({
   
   output$uploadmod3 <- renderUI({
     if(input$var_switch3 == FALSE){
-      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$y_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
+      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$y.var[which(values$corr.names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
     } else{
-      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$x_var[which(values$correlation_names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
+      return(checkboxInput("uploadmod2", strong(paste("Upload ",values$x.var[which(values$corr.names == input$TypeVariable5)], " List:", sep = ""), style = "color:blue"), FALSE))
     }
   })
   
@@ -3766,7 +3774,7 @@ output$Module_Select <- renderUI({
   })
   
   heatmap.data <- reactive({
-    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable1)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable1)]]
     if(input$var_switch == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -3819,9 +3827,9 @@ output$Module_Select <- renderUI({
       }
       
       col_anno <- data.frame(unlist(col_anno2))
-      colnames(col_anno)[1] <- paste(values$x_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+      colnames(col_anno)[1] <- paste(values$x.var[which(values$corr.names == input$TypeVariable1)], "variable", sep = " ")
       if(input$var_switch){
-        colnames(col_anno)[1] <- paste(values$y_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+        colnames(col_anno)[1] <- paste(values$y.var[which(values$corr.names == input$TypeVariable1)], "variable", sep = " ")
       }
       dat <- do.call("cbind", dat2)
       z <- list(col_anno = col_anno, dat = dat)
@@ -3935,9 +3943,9 @@ output$Module_Select <- renderUI({
       }
       dat <- do.call("cbind", dat2)
       col_anno <- as.data.frame(unlist(col_anno2))
-      colnames(col_anno)[1] <- paste(values$x_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+      colnames(col_anno)[1] <- paste(values$x.var[which(values$corr.names == input$TypeVariable1)], "variable", sep = " ")
       if(input$var_switch){
-        colnames(col_anno)[1] <- paste(values$y_var[which(values$correlation_names == input$TypeVariable1)], "variable", sep = " ")
+        colnames(col_anno)[1] <- paste(values$y.var[which(values$corr.names == input$TypeVariable1)], "variable", sep = " ")
       }
       z <- list(col_anno = col_anno, dat = dat)
     }
@@ -3946,7 +3954,7 @@ output$Module_Select <- renderUI({
   })
   
   output$download_heatmap_data <- downloadHandler(
-    filename = function() {paste(values$project_name, "_", "Correlation_heatmap_data.csv",sep = "")},
+    filename = function() {paste(values$project.name, "_", "Correlation_heatmap_data.csv",sep = "")},
     content = function(file) {
       write.csv(heatmap.data()$dat, file, row.names = TRUE)
     }
@@ -4009,7 +4017,7 @@ output$Module_Select <- renderUI({
   }, height = height1, width = width1)
   
   output$download_corr_heatmap <- downloadHandler(
-    filename = function() {paste(values$project_name,"_","Heatmap.png",sep = "")},
+    filename = function() {paste(values$project.name,"_","Heatmap.png",sep = "")},
     content = function(file){
       png(file, width = (plotresolution.corr()/72)*width1(), height = (plotresolution.corr()/72)*height1(), res = plotresolution.corr())
       if(input$colorRange){
@@ -4025,7 +4033,7 @@ output$Module_Select <- renderUI({
   
   output$Visit <- renderUI({
     
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable3)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable3)]]
     if(input$var_switch2 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -4037,7 +4045,7 @@ output$Module_Select <- renderUI({
   })
   
   sub.dat <- reactive({
-    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable3)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable3)]]
     if(input$var_switch2){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -4077,24 +4085,24 @@ output$Module_Select <- renderUI({
     
     correlations <- correlations[,-c(which(colnames(correlations) == "Base_subtracted"), which(colnames(correlations) == "NObs"),
                                      which(colnames(correlations) == "Sign_NegLog10_p"))]
-    colnames(correlations)[1] <- values$y_var[which(values$correlation_names == input$TypeVariable3)]
-    colnames(correlations)[2] <- values$x_var[which(values$correlation_names == input$TypeVariable3)]
+    colnames(correlations)[1] <- values$y.var[which(values$corr.names == input$TypeVariable3)]
+    colnames(correlations)[2] <- values$x.var[which(values$corr.names == input$TypeVariable3)]
     if(input$var_switch2){
-      colnames(correlations)[1] <- values$x_var[which(values$correlation_names == input$TypeVariable3)]
-      colnames(correlations)[2] <- values$y_var[which(values$correlation_names == input$TypeVariable3)]
+      colnames(correlations)[1] <- values$x.var[which(values$corr.names == input$TypeVariable3)]
+      colnames(correlations)[2] <- values$y.var[which(values$corr.names == input$TypeVariable3)]
     }
     return(correlations)
   })
   
   output$download_data <- downloadHandler(
-    filename = function() {paste(values$project_name, "_", "Correlations_subset.csv")},
+    filename = function() {paste(values$project.name, "_", "Correlations_subset.csv")},
     content = function(file) {
       write.csv(subset_correlations(), file, row.names = FALSE)
     }
   )
   
   output$var_switch2 <- renderUI({
-    checkboxInput("var_switch2", strong(paste("Swap ",values$y_var[which(values$correlation_names == input$TypeVariable3)], " and ", values$x_var[which(values$correlation_names == input$TypeVariable3)], " columns", sep = "")),
+    checkboxInput("var_switch2", strong(paste("Swap ",values$y.var[which(values$corr.names == input$TypeVariable3)], " and ", values$x.var[which(values$corr.names == input$TypeVariable3)], " columns", sep = "")),
                   value = FALSE)
   })
   
@@ -4103,7 +4111,7 @@ output$Module_Select <- renderUI({
   })
   
   output$Visit2 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -4115,7 +4123,7 @@ output$Module_Select <- renderUI({
   })
   
   output$subsetcorr2 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -4125,8 +4133,8 @@ output$Module_Select <- renderUI({
   })
   
   correlation.data <- reactive({
-    #correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable5)]]
-    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable5)]]
+    #correlations <- values$corrs[[which(values$corr.names == input$TypeVariable5)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
       colnames(correlations) <- colnames(correlations)[c(2,1,3:ncol(correlations))]
@@ -4138,12 +4146,12 @@ output$Module_Select <- renderUI({
     }
     
     if(input$var_switch3 == TRUE){
-      y <- values$x_var[which(values$correlation_names == input$TypeVariable5)]
-      x <- values$y_var[which(values$correlation_names == input$TypeVariable5)]
+      y <- values$x.var[which(values$corr.names == input$TypeVariable5)]
+      x <- values$y.var[which(values$corr.names == input$TypeVariable5)]
     }
     else{
-      y <- values$y_var[which(values$correlation_names == input$TypeVariable5)]
-      x <- values$x_var[which(values$correlation_names == input$TypeVariable5)]
+      y <- values$y.var[which(values$corr.names == input$TypeVariable5)]
+      x <- values$x.var[which(values$corr.names == input$TypeVariable5)]
     }
     dat <- list()
     cor_vals <- list()
@@ -4256,7 +4264,7 @@ output$Module_Select <- renderUI({
   })
   
   output$download_plot_data <- downloadHandler(
-    filename = function() {paste(values$project_name, "_", "correlations_data.csv")},
+    filename = function() {paste(values$project.name, "_", "correlations_data.csv")},
     content = function(file) {
       write.csv(correlation.data()$GraphFrame, file, row.names = FALSE)
     }
@@ -4354,9 +4362,9 @@ output$Module_Select <- renderUI({
         scale_x_discrete(expand=c(0,1)) + scale_y_discrete(breaks = NULL)
     }
     if(input$bubbleColorRange){
-      graph <- graph + scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0, limits = c(-1,1))
+      graph <- graph + scale_color_gradient2(paste(values$corr.method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0, limits = c(-1,1))
     } else{
-      graph <- graph + scale_color_gradient2(paste(values$correlation_method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0) 
+      graph <- graph + scale_color_gradient2(paste(values$corr.method,"'s r",sep = ""),guide="colorbar",low="navy", high="red", midpoint=0) 
     }
     return(graph)
   })
@@ -4366,7 +4374,7 @@ output$Module_Select <- renderUI({
   }, height = height, width = width)
   
   output$download_corr_plot <- downloadHandler(
-    filename = function() {paste(values$project_name, "_","significant_correlations_plot.png")},
+    filename = function() {paste(values$project.name, "_","significant_correlations_plot.png")},
     content = function(file){
       png(file, width = (plotresolution.corr1()/72)*width(), height = (plotresolution.corr1()/72)*height(), res = plotresolution.corr1())
       print(correlations_makePlot())
@@ -4375,7 +4383,7 @@ output$Module_Select <- renderUI({
   )
   
   output$Visit3 <- renderUI({
-    correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
+    correlations <- values$corrs[[which(values$corr.names == input$TypeVariable7)]]
     visit.name = colnames(correlations)[3]
     visit <- unique(correlations[,3])
     visit <- gtools::mixedsort(as.character(visit))
@@ -4384,8 +4392,8 @@ output$Module_Select <- renderUI({
   
   
   scatter_plot <- reactive({
-    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    correlation_file <- values$correlation_files[[which(values$correlation_names == input$TypeVariable7)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable7)]]
+    correlation_file <- values$corr.files[[which(values$corr.names == input$TypeVariable7)]]
     x <- correlation_file[,input$WithVariable5][which(correlation_file[,colnames(correlations)[3]] == input$visit3)]
     y <- correlation_file[,input$corr_Variable2][which(correlation_file[,colnames(correlations)[3]] == input$visit3)]
     z <- list(x = x, y = y)
@@ -4414,7 +4422,7 @@ output$Module_Select <- renderUI({
   })
   
   scatter_makePlot <- reactive({
-    correlations <- corrResultsOverview()$correlations[[which(values$correlation_names == input$TypeVariable7)]]
+    correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable7)]]
     if(input$log_scale == TRUE){
       dat <- data.frame(x = log2(scatter_plot()$x + 1), y = log2(scatter_plot()$y + 1))
     }
@@ -4452,8 +4460,8 @@ output$Module_Select <- renderUI({
   
   
   output$download_scatter_data <- downloadHandler(
-    filename = function() {correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    paste(values$project_name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,"_data.csv")},
+    filename = function() {correlations <- values$corrs[[which(values$corr.names == input$TypeVariable7)]]
+    paste(values$project.name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,"_data.csv")},
     content = function(file) {
       dat <- scatter_makePlot()$dat
       colnames(dat) <- c(input$WithVariable5, input$corr_Variable2)
@@ -4462,8 +4470,8 @@ output$Module_Select <- renderUI({
   )
   
   output$download_scatter <- downloadHandler(
-    filename = function() {correlations <- values$correlations[[which(values$correlation_names == input$TypeVariable7)]]
-    paste(values$project_name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,".png")},
+    filename = function() {correlations <- values$corrs[[which(values$corr.names == input$TypeVariable7)]]
+    paste(values$project.name, "_",input$corr_Variable2, "vs", input$WithVariable5, "_", colnames(correlations)[3], input$visit3,".png")},
     content = function(file){
       png(file, width = (plot_res5()/72)*width(), height = (plot_res5()/72)*height(), res = plot_res5())
       print(scatter_makePlot()$scatplot)

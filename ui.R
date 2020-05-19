@@ -93,7 +93,7 @@ body <-  dashboardBody(
                     tags$style(type="text/css", "tfoot {display: table-header-group}") # Move filters to top of datatable
                   ),
                   downloadButton('downloadDesign', "Download Table"),
-                  dataTableOutput('designDataTable')
+                  DTOutput('designDataTable')
               )
             )
     ),
@@ -348,13 +348,12 @@ body <-  dashboardBody(
                   conditionalPanel(condition = "input.overviewFc",
                                    numericInput("selectFcValue", label = "Fold change threshold:",min = 0, value = 0, step = 0.1),
                                    selectInput("selectFcSign","Fold change sign:", c("+", "-", "Both"), c("Both"))),
-                  #selectInput("sigsign", "Fold change sign:", c("All (include 0)", "+", "-"), selected = "all (include 0)"),
                   tags$hr() # add a horizontal line
               ),
               box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                   helpText("Cell value represents the number of significant probes under the selected significance level."),
                   downloadButton('downloadSC', 'Download Table'),
-                  dataTableOutput("sigcomptable")
+                  DTOutput("sigcomptable")
               )
             )
     ),
@@ -376,7 +375,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadSigComps", "Download Table"),
-                                    dataTableOutput('CompOverview')
+                                    DTOutput('CompOverview')
                                 )
                               )
                      ),
@@ -414,7 +413,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Table", width = 7, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadTable2", "Download Table"),
-                                    dataTableOutput('MultipleCompTab')
+                                    DTOutput('MultipleCompTab')
                                 )
                               )
                      ),
@@ -441,7 +440,7 @@ body <-  dashboardBody(
                                        ),
                                        box(title = "Results Table", width = NULL, status = "primary", solidHeader = FALSE,
                                            downloadButton("downloadTable3", "Download Table"),
-                                           dataTableOutput('GeneSetTab')
+                                           DTOutput('GeneSetTab')
                                        )
                                 )
                               )
@@ -461,7 +460,7 @@ body <-  dashboardBody(
                                   ),
                                   box(title = "Results Overview", 
                                       downloadButton("downloadSigCompsR", "Download Table"),
-                                      dataTableOutput('CompOverviewR')
+                                      DTOutput('CompOverviewR')
                                   )
                                 )
                        )
@@ -479,7 +478,7 @@ body <-  dashboardBody(
                                   ),
                                   box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                       downloadButton('downloadFC', 'Download Table'),
-                                      dataTableOutput("FlowOverview")
+                                      DTOutput("FlowOverview")
                                   )
                                 )
                        ),
@@ -492,7 +491,7 @@ body <-  dashboardBody(
                                   box(title = "Flow List", width = 8, status = "primary", solidHeader = FALSE,
                                       helpText("Right click on hyperlinks to open in new window"),
                                       downloadButton('downloadFL', 'Download Table'),
-                                      dataTableOutput("flowlisttable")
+                                      DTOutput("flowlisttable")
                                   )
                                 )
                        ),
@@ -520,7 +519,7 @@ body <-  dashboardBody(
                                          fluidRow(
                                            box(title = "Table", width = 12, status = "primary", solidHeader = FALSE,
                                                downloadButton('downloadFlowSummaries','Download Table'),
-                                               dataTableOutput("FlowPlotSummary")
+                                               DTOutput("FlowPlotSummary")
                                            ) 
                                          )
                                   ) 
@@ -566,7 +565,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('downloadFC2', 'Download Table'),
-                                    dataTableOutput("MetabOverview")
+                                    DTOutput("MetabOverview")
                                 )
                               )
                      ),
@@ -581,7 +580,7 @@ body <-  dashboardBody(
                                 box(title = "Metabolite List", width = 8, status = "primary", solidHeader = FALSE,
                                     helpText("Right click on hyperlinks to open in new window"),
                                     downloadButton('downloadME', 'Download Table'),
-                                    dataTableOutput("metablisttable")
+                                    DTOutput("metablisttable")
                                 )
                               )
                      ),
@@ -605,7 +604,7 @@ body <-  dashboardBody(
                                     downloadButton('downloadMetabPlot2', 'Download Figure'),
                                     plotOutput("MetabPlot2"),
                                     downloadButton('downloadMetabSummaries','Download Table'),
-                                    dataTableOutput("MetabPlotSummary")
+                                    DTOutput("MetabPlotSummary")
                                 )
                               )
                      ),
@@ -656,7 +655,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('downloadOverviewCorrTable', 'Download Table'),
-                                    dataTableOutput("corrOverview")
+                                    DTOutput("corrOverview")
                                 )
                               )
                      ),
@@ -763,7 +762,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('download_data', "Download Table"),
-                                    dataTableOutput("correlation_table")
+                                    DTOutput("correlation_table")
                                 )
                               )
                      ),

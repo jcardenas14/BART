@@ -16,6 +16,7 @@ library(shinyjs)
 library(stringr)
 library(dplyr)
 library(shinydashboard)
+library(DT)
 
 #enableBookmarking(store = "server")
 
@@ -297,8 +298,6 @@ filterOpts <- function(input, output, session, data, comparison = NULL, data.typ
       results <- results[,c(1,2,which(colnames(results) %in% paste0("Estimate.", comparison()) | colnames(results) %in% paste0("Test.statistic.", comparison()) | 
                                        colnames(results) %in% paste0("P.Value.", comparison()) | colnames(results) %in% paste0("FDR.P.Value.", comparison())))]
     }
-    #fdr <- p.adjust(results[,5], method = "fdr")
-    #fdr <- results[,6]
     bonf <- p.adjust(results[,5], method = "bonferroni")
     results <- do.call("cbind", list(results, Bonf = bonf))
     if(data.type == "genes"){
@@ -470,10 +469,8 @@ subsetAndOrderUI <- function(id){
     div(style = "display:inline-block", checkboxInput(ns("subsetCols"),strong("Subset column options", style = "color:#456dae"),FALSE)),
     div(style = "display:inline-block", helpPopup("Subset column options", "These options allow the user to plot a subset of the samples within the expression data set.")),
     conditionalPanel(condition = condCall1,
-                     uiOutput(ns('subsetVar1')),
-                     uiOutput(ns('subsetVal1')),
-                     uiOutput(ns('subsetVar2')),
-                     uiOutput(ns('subsetVal2'))
+                     uiOutput(ns('subsetVars')),
+                     uiOutput(ns('subsetVals'))
     ),
     br(),
     div(style = "display:inline-block", checkboxInput(ns('orderCols'), strong("Ordering column options", style = "color:#456dae"), FALSE)),
@@ -487,21 +484,21 @@ subsetAndOrderUI <- function(id){
 subsetAndOrderRenderUI <- function(input, output, session, des){
   return(
     tagList(
-      output$subsetVar1 <- renderUI({
+      output$subsetVars <- renderUI({
         ns <- session$ns
-        selectizeInput(ns("subsetVar1"),"Variable 1 to subset heatmap:",c(colnames(des())), selected = NULL,multiple = TRUE,options = list(maxItems = 1))
+        selectizeInput(ns("subsetVars"),"Variable(s) to subset heatmap:",c(colnames(des())), selected = NULL,multiple = TRUE)
       }),
-      output$subsetVal1 <- renderUI({
+      output$subsetVals <- renderUI({
         ns <- session$ns
-        selectizeInput(ns("subsetVal1"),"Value(s) of Variable to subset heatmap:", unique(des()[,input$subsetVar1]), multiple=TRUE)
-      }),
-      output$subsetVar2 <- renderUI({
-        ns <- session$ns
-        selectizeInput(ns("subsetVar2"),"Variable 2 to subset heatmap:",c(colnames(des())),selected = NULL, multiple = TRUE,options = list(maxItems = 1))
-      }),
-      output$subsetVal2 <- renderUI({
-        ns <- session$ns
-        selectizeInput(ns("subsetVal2"),"Value(s) of Variable to subset heatmap:", unique(des()[,input$subsetVar2]), multiple=TRUE)
+        if(is.null(input$subsetVars)){
+          return(NULL)
+        }
+        subsetVals <- lapply(1:length(input$subsetVars), function(i) {
+          selectizeInput(ns(paste0("subsetVals",i)),paste0("Select ",input$subsetVars[i], " values"), 
+                         choices = unique(des()[,input$subsetVars[i]]), selected = unique(des()[,input$subsetVars[i]]), multiple = TRUE)
+        })
+        subsetVals <- do.call(tagList, subsetVals)
+        return(subsetVals)
       }),
       output$orderingVars <- renderUI({
         ns <- session$ns
@@ -518,32 +515,35 @@ subsetAndOrder <- function(input, output, session, des, data, sampleAnnot){
     colnames(x) <- as.character(des()[,sampleAnnot()])
   }
   if(input$subsetCols){
-    if(!is.null(input$subsetVar1) & !is.null(input$subsetVar2)){
-      x.sub <- x[,which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2)]
-      design <- des()[which(des()[,input$subsetVar1] %in% input$subsetVal1 & des()[,input$subsetVar2] %in% input$subsetVal2),]
-      design[,input$subsetVar1] <- factor(as.character(design[,input$subsetVar1]), levels = input$subsetVal1)
-      design[,input$subsetVar2] <- factor(as.character(design[,input$subsetVar2]), levels = input$subsetVal2)
-    } else if(!is.null(input$subsetVar1) & is.null(input$subsetVar2)){
-      x.sub <- x[,which(des()[,input$subsetVar1] %in% input$subsetVal1)]
-      design <- des()[which(des()[,input$subsetVar1] %in% input$subsetVal1),]
-      design[,input$subsetVar1] <- factor(as.character(design[,input$subsetVar1]), levels = input$subsetVal1)
-    } else if(is.null(input$subsetVar1) & is.null(input$subsetVar2)){
-      x.sub <- x
+    if(!is.null(input$subsetVars)){
+      subsetVals <- keep <- list()
       design <- des()
+      for(i in 1:length(input$subsetVars)){
+        subsetVals[[i]] <- eval(parse(text = paste0("input$subsetVals",i)))
+        keep[[i]] <- which(design[,input$subsetVars[i]] %in% subsetVals[[i]])
+        design[,input$subsetVars[i]] <- as.character(design[,input$subsetVars[i]])
+        design[,input$subsetVars[i]] <- factor(design[,input$subsetVars[i]], levels = unique(subsetVals[[i]]))
+      }
+      keep <- Reduce(intersect, keep)
+      x <- x[,keep]
+      design <- design[keep,]
+      order.vars <- do.call(order, design[,input$subsetVars, drop = FALSE])
+      x <- x[,order.vars]
+      design <- design[order.vars,]
     }
     if(input$orderCols){
       order.vars <- do.call(order, design[,input$orderingVars, drop = FALSE])
-      x.ord <- x.sub[,order.vars]
+      x.ord <- x[,order.vars]
       colAnnot <- design[order.vars,input$orderingVars,drop = FALSE]
       design <- design[order.vars,]
     } else {
-      orderingVars <- c(input$subsetVar1, input$subsetVar2)
+      orderingVars <- input$subsetVars
       order.vars <- do.call(order, design[,orderingVars, drop = FALSE])
-      x.ord <- x.sub[,order.vars]
+      x.ord <- x[,order.vars]
       colAnnot <- design[order.vars,orderingVars, drop = FALSE]
-      if(is.null(input$subsetVar1) & is.null(input$subsetVar2)){
+      if(is.null(input$subsetVars)){
         orderingVars <- colnames(des())[1]
-        x.ord <- x.sub[,order(design[,orderingVars])]
+        x.ord <- x[,order(design[,orderingVars])]
         colAnnot <- design[order(design[,orderingVars]),orderingVars,drop = FALSE]
       }
     }
@@ -804,5 +804,3 @@ graphOptions <- function(input, output, session, varType = "transcripts"){
   }
   return(list(width = width, height = height, fontSize = fontSize, legendSize = legendSize, treeHeight = treeHeight, resolution = resolution, circleSize = circleSize))
 }
-
-

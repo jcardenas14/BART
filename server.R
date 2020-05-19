@@ -448,8 +448,13 @@ shinyServer(function(input,output, session){
   })
 
 
-  output$designDataTable<- renderDataTable({
-    design()$des
+  output$designDataTable<- renderDT({
+    datatable(design()$des,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadDesign <- downloadHandler(
@@ -596,8 +601,13 @@ shinyServer(function(input,output, session){
     }
   })
   
-  output$summaryTable <- renderDataTable({
-    table0()
+  output$summaryTable <- renderDT({
+    datatable(table0(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
   
   output$summaryTable2 <- renderTable({
@@ -1341,10 +1351,15 @@ output$Unsupervised <- renderMenu({
     return(y)
   })
 
-  output$sigcomptable <- renderDataTable({
+  output$sigcomptable <- renderDT({
     withProgress(message = 'Making the table',
                  detail = 'This may take a while...', value = 1,{
-                   siglist()$z[order(siglist()$z$Raw,decreasing=TRUE),]
+                   datatable(siglist()$z[order(siglist()$z$Raw,decreasing=TRUE),],
+                             class = "table-condensed",
+                             style = "bootstrap4",
+                             rownames = FALSE,
+                             options = list(autowidth = TRUE, scrollX = TRUE)
+                   )
                  })
   })
   
@@ -1385,10 +1400,15 @@ output$Unsupervised <- renderMenu({
     data.frame(mydata)
   })
 
-  output$numtable <-renderDataTable({
+  output$numtable <-renderDT({
     numtab<-cbind(plotdata()[,1],plotdata()[,2:4]*dim(values$results.file)[1])
     names(numtab)<-c("Alpha", "Raw", "FDR", "Bonf")
-    return(numtab)
+    datatable(numtab,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
   
   sel_genelists <- reactive({
@@ -1530,25 +1550,35 @@ output$Unsupervised <- renderMenu({
     if(!is.null(values$dge.annots)){
       y <- values$dge.annots
       colnames(y) <- c("Gene.Set", "Annotation")
-      x <- merge(x, y, by = "Gene.Set", all = TRUE)
+      x <- full_join(x, y, by = "Gene.Set", all = TRUE)
     }
     return(x)
   })
 
-  output$genelisttable <-renderDataTable({
+  output$genelisttable <-renderDT({
     y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison),"genes")
     if(!is.null(values$dge.gsets)){
       if(input$merge){
-        x <- mergeDgeGeneSet()[!duplicated(mergeDgeGeneSet()[,2]),]
+        x <- mergeDgeGeneSet()
         colnames(x)[2] <- "Transcript.ID"
-        mergeData <- merge(y, x, by = "Transcript.ID", all.x = TRUE)[,-c(1:ncol(y)),drop = FALSE]
-        y <- cbind(y[,c(1,2)],mergeData, y[,c(3:ncol(y))])
+        y <- full_join(y, x, by = "Transcript.ID") %>%
+          select(Transcript.ID, Gene.Symbol, Gene.Set, Annotation, everything())
+      }
+    }
+    for(i in 1:ncol(y)){
+      if(is.numeric(y[,i])){
+        y[,i] <- as.numeric(formatC(y[,i], digits = 4))
       }
     }
     y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
-    escape = FALSE
-    y
-  },escape=FALSE)
+    datatable(y,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              escape = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
+  })
 
   sig_exp_file <- reactive({
     g <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparison2),"genes")
@@ -2108,12 +2138,17 @@ output$Unsupervised <- renderMenu({
     return(x)
   })
 
-  output$vennIntersection <- renderDataTable({
+  output$vennIntersection <- renderDT({
     y <- genelist2()
     y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
-    escape = FALSE
-    y
-  }, escape = FALSE)
+    datatable(y,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              escape = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
+  })
 
   output$vennDiagram <- renderPlot({
     dummy <- data.frame("No Genes Present")
@@ -2629,15 +2664,20 @@ output$Module_Select <- renderUI({
     gt
   })
 
-  output$GeneSetTab <- renderDataTable({
+  output$GeneSetTab <- renderDT({
     if(is.null(master())){return(NULL)}
     if(is.null(individual_modselect())){return(NULL)}
     y <- individual_modselect()$mmr_modselection
     y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
     y <- y[,-1]
-    escape = FALSE
-    y
-  }, escape = FALSE)
+    datatable(y,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              escape = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
+  })
 
   output$GeneSetPlot <- renderPlot({
     if(is.null(master())){return(NULL)}
@@ -2645,9 +2685,14 @@ output$Module_Select <- renderUI({
     grid.draw(individual_modplot())
   },width = plotWidth2, height = 400)
 
-  output$CompOverview <- renderDataTable({
+  output$CompOverview <- renderDT({
     if(is.null(master())){return(NULL)}
-    comp_overview()
+    datatable(comp_overview(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$foldchange1 <- renderPlot({
@@ -2703,7 +2748,7 @@ output$Module_Select <- renderUI({
     grid.draw(venn.d())
   })
 
-  output$MultipleCompTab <- renderDataTable({
+  output$MultipleCompTab <- renderDT({
     if(is.null(master())){return(NULL)}
     if(!is.null(values$annots)){
       if(input$only_annotated){
@@ -2717,7 +2762,17 @@ output$Module_Select <- renderUI({
     }
     comp_subset1 <- comp_subset1[,-c(1,11)]
     colnames(comp_subset1)[which(colnames(comp_subset1) == "p.Value")] <- "P.Value"
-    comp_subset1[,c(1,9,2,3,4,8,5,6,7)]
+    for(i in 1:ncol(comp_subset1)){
+      if(is.numeric(comp_subset1[,i])){
+        comp_subset1[,i] <- as.numeric(formatC(comp_subset1[,i], digits = 4))
+      }
+    }
+    datatable(comp_subset1[,c(1,9,2,3,4,8,5,6,7)],
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadSigComps <- downloadHandler(
@@ -2811,8 +2866,13 @@ output$Module_Select <- renderUI({
     results
   })
 
-  output$CompOverviewR <- renderDataTable({
-    roast.overview()
+  output$CompOverviewR <- renderDT({
+    datatable(roast.overview(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   ###################FLOW PART##########################
@@ -2848,8 +2908,13 @@ output$Module_Select <- renderUI({
     y
   })
 
-  output$FlowOverview <- renderDataTable({
-    FClist()
+  output$FlowOverview <- renderDT({
+    datatable(FClist(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadFC <- downloadHandler(
@@ -2866,9 +2931,14 @@ output$Module_Select <- renderUI({
     selectInput("compflow", "Comparison Selection:", comp.names, comp.names[1])
   })
 
-  output$flowlisttable <-renderDataTable({
+  output$flowlisttable <-renderDT({
     y <- callModule(filterOpts, "flowResultsTable", data = reactive(values$flow.results), comparison = reactive(input$compflow), data.type = "flow")
-    return(y)
+    datatable(y,
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadFL <- downloadHandler(
@@ -3003,10 +3073,15 @@ output$Module_Select <- renderUI({
     flowplot()
   })
 
-  output$FlowPlotSummary<-renderDataTable({
+  output$FlowPlotSummary<-renderDT({
    if(length(input$FlowPlotVars) == 0){return(NULL)}
    results <- summarizeData(data = FlowData(), numeric.vars = input$FlowPlotVars, by = c(input$flowPlotGroup1, input$flowPlotGroup2))
-   return(results)
+   datatable(results,
+             class = "table-condensed",
+             style = "bootstrap4",
+             rownames = FALSE,
+             options = list(autowidth = TRUE, scrollX = TRUE)
+   )
   })
 
   output$downloadFlowResults <- downloadHandler(
@@ -3077,8 +3152,13 @@ output$Module_Select <- renderUI({
     y
   })
 
-  output$MetabOverview <- renderDataTable({
-    Mlist()
+  output$MetabOverview <- renderDT({
+    datatable(Mlist(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadFC2 <- downloadHandler(
@@ -3112,9 +3192,14 @@ output$Module_Select <- renderUI({
     }
   })
 
-  output$metablisttable <-renderDataTable({
+  output$metablisttable <-renderDT({
     if(is.null(metablist())){return(NULL)}
-    metablist()
+    datatable(metablist(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadME <- downloadHandler(
@@ -3141,8 +3226,13 @@ output$Module_Select <- renderUI({
     MetabMMR()
   })
 
-  output$MetabResultTable<-renderDataTable({
-    head(MetabResult())
+  output$MetabResultTable<-renderDT({
+    datatable(head(MetabResult()),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$MetabDataNames<-renderUI({
@@ -3574,8 +3664,13 @@ output$Module_Select <- renderUI({
     #}
   #)
 
-  output$MetabPlotSummary<-renderDataTable({
-    MetabPlotSummary1()
+  output$MetabPlotSummary<-renderDT({
+    datatable(MetabPlotSummary1(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
 
   output$downloadMetabResults <- downloadHandler(
@@ -3684,10 +3779,15 @@ output$Module_Select <- renderUI({
     z <- list(correlations = correlations, results = results)
   })
   
-  output$corrOverview <- renderDataTable({
+  output$corrOverview <- renderDT({
     withProgress(message = 'Making Results Table',
                  detail = 'This may take a while...', value = .1,{
-                   corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),]
+                   datatable(corrResultsOverview()$results[order(corrResultsOverview()$results$Raw, decreasing = TRUE),],
+                             class = "table-condensed",
+                             style = "bootstrap4",
+                             rownames = FALSE,
+                             options = list(autowidth = TRUE, scrollX = TRUE)
+                   )
                  }
     )
   })
@@ -4106,8 +4206,13 @@ output$Module_Select <- renderUI({
                   value = FALSE)
   })
   
-  output$correlation_table <- renderDataTable({
-    subset_correlations()
+  output$correlation_table <- renderDT({
+    datatable(subset_correlations(),
+              class = "table-condensed",
+              style = "bootstrap4",
+              rownames = FALSE,
+              options = list(autowidth = TRUE, scrollX = TRUE)
+    )
   })
   
   output$Visit2 <- renderUI({

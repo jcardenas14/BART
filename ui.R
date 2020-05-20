@@ -1,6 +1,3 @@
-#User Interface for PALO FILTER Script!
-#options(shiny.deprecation.messages = FALSE)
-
 function(request){
 
 header <- dashboardHeader(title = "Biostatistical Analysis Reporting Tool (BART)",
@@ -23,34 +20,9 @@ sidebar <- dashboardSidebar(
 )
 
 body <-  dashboardBody(
-  tags$style(HTML(".skin-blue .main-header .navbar {background-color: #2c343a}
-              .skin-blue .left-side, .skin-blue .main-sidebar, .skin-blue .wrapper {background-color: #363f47}
-              .skin-blue .main-header .logo {background-color: #2c343a}
-              .skin-blue .main-header .logo:hover {background-color: #456dae}
-              .skin-blue .main-header .navbar .sidebar-toggle:hover {background-color: #456dae}
-              .skin-blue .sidebar-menu>li.active>a, .skin-blue .sidebar-menu>li:hover>a {border-left-color: #456dae}
-              .box.box-primary {border-top-color: #18c4be}
-              .nav-tabs-custom>.nav-tabs>li.active {border-top-color: #456dae}
-              .box-body {width: 100%}
-              #designDataTable.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #sigcomptable.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #genelisttable.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #vennIntersection.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #MultipleCompTab.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #GeneSetTab.shiny-datatable-output.shiny-bound-output {overflow-x: auto}
-              #summary1.shiny-html-output.shiny-bound-output {overflow-x: auto}
-              #summary0.shiny-html-output.shiny-bound-output {overflow-x: auto}
-              #modHeatmap.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #heatmap.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #modMap.shiny-plot-output.shiny-bound-output {height: auto !important}
-              #heatmap1.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #modDgeMap.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #indFcPlot .col-sm-12 {padding-left: 0px; padding-right: 0px}
-              #GeneSetPlot.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #foldchange1.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #correlations_plotOverview.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #correlations_plot.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}
-              #correlations_scatter_plot.shiny-plot-output.shiny-bound-output {height: auto !important; overflow-x: auto}")),
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "stylesheet.css")
+  ),
   shinyjs::useShinyjs(),
   tabItems(
     #tabItem(tabName = "intro",
@@ -65,7 +37,6 @@ body <-  dashboardBody(
                   uiOutput('exampleData'),
                   uiOutput('uploadExampleData'),
                   br(),
-                  #bookmarkButton(),
                   tags$script('
                               Shiny.addCustomMessageHandler("resetFileInputHandler", function(x) {      
                               var id = "#" + x + "_progress";
@@ -93,6 +64,8 @@ body <-  dashboardBody(
                     tags$style(type="text/css", "tfoot {display: table-header-group}") # Move filters to top of datatable
                   ),
                   downloadButton('downloadDesign', "Download Table"),
+                  br(),
+                  br(),
                   DTOutput('designDataTable')
               )
             )
@@ -101,9 +74,8 @@ body <-  dashboardBody(
     tabItem(tabName = "summary",
             fluidRow(
               box(title = "Summarization Options", width = 4, status = "primary", solidHeader = FALSE,
-                  uiOutput('summaryName'),
-                  uiOutput('groupingVar1'),  
-                  uiOutput('groupingVar2'),
+                  uiOutput('mainSummaryVar'),
+                  uiOutput('groupingVars'), 
                   selectInput("digits", 
                               label = "Number of decimal places:",
                               choices = c(0,1,2,3,4),
@@ -113,20 +85,14 @@ body <-  dashboardBody(
               box(title = "Summary Table", width = 8, status = "primary", solidHeader = FALSE,
                   downloadButton('downloadSummary0', 'Download Table'),
                   br(),
+                  br(),
                   div(style = "display:inline-block", uiOutput("summaryText")),
                   div(style = "display:inline-block", helpPopup("Summary Table", "Displays summary statistics for a user selected variable of interest (numeric or categorical) with
-                                                                the option to add up to two grouping factors.", placement = "right",
-                                                                trigger = "click")),
+                                                                the option to group by additional factors.", placement = "right",
+                                                                trigger = "hover")),
                   uiOutput('summary0')
               )
             )
-    ),
-    
-    tabItem(tabName = "pvca",
-            helpText("Data Filtering and Batch Assesment Summary:"),
-            textOutput("PVCAtext"), #reactive text with the new content
-            imageOutput('PVCA1'),  
-            imageOutput('PVCA2')
     ),
     
     tabItem(tabName = "fastqc",
@@ -161,6 +127,8 @@ body <-  dashboardBody(
                                  numericInput('PlotResolutionqc', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1))),
               mainPanel(
                 downloadButton('downloadQC', 'Download Figure'),
+                br(),
+                br(),
                 uiOutput("QCbox")
               )
             )
@@ -175,7 +143,7 @@ body <-  dashboardBody(
                                     div(style = "display:inline-block", actionButton("go", "Plot")),
                                     div(style = "display:inline-block", infoPopup("Plot", 'The heatmap will not update until the "Plot" button is clicked.
                                                                                   This allows the user to make multiple adjustments at once, without having to wait for 
-                                                                                  each individual adjustment to update on the heatmap.', placement = "right", trigger = "click")),
+                                                                                  each individual adjustment to update on the heatmap.', placement = "right", trigger = "hover")),
                                     uiOutput('test'),
                                     br(),
                                     uploadVarsUI("transcripts", varType = "probes"),
@@ -201,11 +169,12 @@ body <-  dashboardBody(
                                                                                   for the heatmap index. The default is set to +/- 2. If the user would like the index to have the most extreme red and blue 
                                                                                   to be set to a value of +/- 4 then user simply needs to enter 4. The user can also enter 0 which will make the limits based 
                                                                                   on the max and min of the entire expression file.',
-                                                                                  placement = "bottom", trigger = "click")),
+                                                                                  placement = "bottom", trigger = "hover")),
                                     helpText(""),
                                     textOutput('OptimalNumber'),
                                     downloadButton('downloadHeatmapData', 'Download Data'),
                                     downloadButton("downloadHeatmap", "Download Figure"),
+                                    br(),
                                     uiOutput("plotGeneSymbols"),
                                     helpText(""),
                                     plotOutput('heatmap')
@@ -225,6 +194,7 @@ body <-  dashboardBody(
                                       ),
                                       div(class = "col-md-8",
                                           downloadButton('downloadClusterPlot3', 'Download Figure'),
+                                          br(),
                                           plotOutput('clusterPlot')
                                       )
                                   )
@@ -285,11 +255,12 @@ body <-  dashboardBody(
                                                                                   The remaining options are either graphical parameters or subsetting paramaters. The user can specify to look at all the Baylor modules at once, only the first 6 rounds, or only annotated ones.
                                                                                   If there are too many samples the user can subset the data (Subset the module map checkbox) by selecting up to two variables two subset on. This allows the user to only look at certain subgroups like just the male, high responders.
                                                                                   Use the graphing inputs to make the heatmap pretty. It is suggested to start with the size and aspect ratio and only edit the circle sizes if needed after.",
-                                                                                  placement = "bottom", trigger = "click")),
+                                                                                  placement = "bottom", trigger = "hover")),
                                     helpText(""),
                                     textOutput('modOptimalNumber'),
                                     downloadButton('downloadModMap3Other', 'Download Data'),
                                     downloadButton("downloadModPlot3Other", "Download Figure"),
+                                    br(),
                                     plotOutput('modHeatmap')
                                 )
                               )
@@ -307,6 +278,7 @@ body <-  dashboardBody(
                                           ),
                                       div(class = "col-md-8",
                                           downloadButton('downloadClusterPlot2Other', 'Download Figure'),
+                                          br(),
                                           plotOutput('modClusterPlot')
                                       )
                                   )
@@ -339,31 +311,182 @@ body <-  dashboardBody(
               )
             )
     ),
-    
-    tabItem(tabName = "overview",
+    #tabItem(tabName = "genelistmaker",
+    #        fluidRow(
+    #          uiOutput("dgeTabs")
+    #        )
+    #),
+    tabItem(tabName = "genelistmaker",
             fluidRow(
-              box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
-                  numericInput('alphalevel2',"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),  
-                  checkboxInput("overviewFc",label = strong("Filter on fold change:"),value = FALSE),
-                  conditionalPanel(condition = "input.overviewFc",
-                                   numericInput("selectFcValue", label = "Fold change threshold:",min = 0, value = 0, step = 0.1),
-                                   selectInput("selectFcSign","Fold change sign:", c("+", "-", "Both"), c("Both"))),
-                  tags$hr() # add a horizontal line
-              ),
-              box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
-                  helpText("Cell value represents the number of significant probes under the selected significance level."),
-                  downloadButton('downloadSC', 'Download Table'),
-                  DTOutput("sigcomptable")
+              tabBox(title = "DGE Results", width = 12, id = "dgeResults",
+                     tabPanel(title = "Overview",
+                              fluidRow(
+                                box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
+                                    numericInput('alphalevel2',"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),  
+                                    checkboxInput("overviewFc",label = strong("Filter on fold change:"),value = FALSE),
+                                    conditionalPanel(condition = "input.overviewFc",
+                                                     numericInput("selectFcValue", label = "Fold change threshold:",min = 0, value = 0, step = 0.1),
+                                                     selectInput("selectFcSign","Fold change sign:", c("+", "-", "Both"), c("Both"))),
+                                    tags$hr() # add a horizontal line
+                                ),
+                                box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
+                                    helpText("Cell value represents the number of significant probes under the selected significance level."),
+                                    downloadButton('downloadSC', 'Download Table'),
+                                    br(),
+                                    br(),
+                                    DTOutput("sigcomptable")
+                                )
+                              )
+                     ),
+                     tabPanel(title = "Gene Lists",
+                              fluidRow(
+                                box(title = "Filtering Options", width = 4, status = "primary", solidHeader = FALSE,
+                                    uiOutput("Comparison1"),
+                                    filterOptsUI("dgeResultsTable"),
+                                    uiOutput("merge"),
+                                    uiOutput("modmaplmmres"),
+                                    checkboxInput("DownloadOptions", strong("Download multiple genelists at once:", style = "color:#456dae"), FALSE),
+                                    conditionalPanel(condition = "input.DownloadOptions",
+                                                     uiOutput("selectComps"),
+                                                     textInput("ziptext", label = "Filename Input", value = "All_Comparisons_Raw.05"),
+                                                     downloadButton('downloadSelComp', 'Download selected genelists')
+                                    )
+                                ),
+                                box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
+                                    uiOutput("baylorMods"),
+                                    uiOutput('downloadModMap'),
+                                    uiOutput('moduleMap'),
+                                    helpText("Right click on hyperlinks to open in new window"),
+                                    downloadButton('downloadData', 'Download Table'),
+                                    br(),
+                                    br(),
+                                    DTOutput("genelisttable")
+                                )
+                              )
+                     ),
+                     tabPanel(title = "Diagnostics",
+                              fluidRow(
+                                column(width = 4,
+                                       box(title = "Comparison Selection", width = NULL, status = "primary",
+                                           uiOutput("diagnosticsComparison")
+                                       ),
+                                       box(title = "Overview Table", width = NULL, status = "primary",
+                                           DTOutput("numtable")
+                                       )
+                                ),
+                                box(title = "P-Value Distribution Assesment", width = 8, status = "primary", solidHeader = FALSE,
+                                    plotOutput("distplot"), 
+                                    plotOutput("genelistgraph"), 
+                                    textOutput("intro")
+                                )
+                              )
+                     ),
+                     tabPanel(title = "Significant Variables Heatmap",
+                              fluidRow(
+                                box(title = "Heatmap Options", width = 4, status = "primary", solidHeader = FALSE,
+                                    div(style = "display:inline-block", actionButton("go2", "Plot")),
+                                    div(style = "display:inline-block", infoPopup("Plot", 'The heatmap will not update until the "Plot" button is clicked.
+                                                    This allows the user to make multiple adjustments at once, without having to wait for 
+                                                    each individual adjustment to update on the heatmap.', placement = "right", trigger = "hover")),
+                                    uiOutput("Comparison3"),
+                                    filterOptsUI("dgeHeatmap"),
+                                    uiOutput('test1'),
+                                    div(style = "display:inline-block", checkboxInput("rowCluster", strong("Row Cluster"), value = FALSE)),
+                                    div(style = "display:inline-block", infoPopup("Row Cluster", "Based on the PC performance, it might not be recommended to cluster the rows if the number of rows exceed 7000",
+                                                                                  placement = "right", trigger = "hover")),
+                                    br(),
+                                    maxValuesUI("dgeMaxValues"),
+                                    br(),
+                                    subsetAndOrderUI("dgeSubOrder"),
+                                    br(),
+                                    colClusterUI("dgeCluster"),
+                                    br(),
+                                    graphOptionsUI("dgeGraphOptions")
+                                ),
+                                box(title = "Heatmap", width = 8, status = "primary", solidHeader = FALSE,
+                                    infoPopup("Help Message", 'The heat map below is constructed on individual samples for a number of scenarios,
+                specifically for baseline samples only (cross sectional) or all samples at all time points.  For baseline samples,
+                heatmaps can be generated based on normalizing the expression data to the median, or to a control group if applicable.
+                When all samples at all time points are to be plotted, heatmaps can be generated by normalizing to the median,
+                a control group, or each subjects own baseline value. Only samples that have a corresponding baseline sample are
+                included in the map. The initial graph of the heat map may not be very appealing depending on the number of samples.
+                The inputs on the left have a wide variety of user options that range from the type of normalized data, clustering rows
+                and columns, subsetting samples and probes, etc. These options are consistent across all the unsupervised analysis plots.
+                One addition, unique to the probe level heat map is the "Max value on color key" option that specifies the coloring legend
+                for the heatmap index. The default is set to +/- 2. If the user would like the index to have the most extreme red and blue
+                to be set to a value of +/- 4 then user simply needs to enter 4. The user can also enter 0 which will make the limits based
+                on the max and min of the entire expression file.',
+                                              placement = "bottom", trigger = "hover"),
+                                    helpText(""),
+                                    downloadButton('downloadHeatmap1', 'Download Data'),
+                                    downloadButton('downloadHeatmap2', 'Download Figure'),
+                                    checkboxInput("dgePlotGeneSymbols", strong("Plot Gene Symbols?"), FALSE),
+                                    plotOutput("heatmap1")
+                                )
+                              )
+                     ),
+                     tabPanel(title = "Venn Diagram",
+                              fluidRow(
+                                box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
+                                    filterOptsUI("dgeVenn"),
+                                    uiOutput("vennComparison"),
+                                    selectInput("UorI", "Intersection or union:", c("Intersection" = 1, "Union" = 2), selected = 1),
+                                    uiOutput("include"),
+                                    uiOutput("exclude")
+                                ),
+                                column(width = 8,
+                                       box(title = "Venn Diagram", width = NULL, status = "primary", solidHeader = FALSE,
+                                           downloadButton('downloadVennPic', 'Download Figure'),
+                                           plotOutput("vennDiagram")
+                                       ),
+                                       box(title = "Venn Results Table", width = NULL, status = "primary", solidHeader = FALSE,
+                                           downloadButton('downloadVennData', 'Download Data'),
+                                           br(),
+                                           br(),
+                                           DTOutput("vennIntersection")
+                                       )
+                                )
+                              )
+                     ),
+                     tabPanel(title = "Modular DGE Analysis",
+                              fluidRow(
+                                box(title = "Options", width = 4, status = "primary", solidHeader = FALSE,
+                                    actionButton("goModDge", "Plot"),
+                                    br(),
+                                    div(style = "display:inline-block", checkboxInput(inputId = "compSelect", label = strong("Comparison(s) selection:", style = "color:#456dae"), value = FALSE)),
+                                    div(style = "display:inline-block", helpPopup("Comparison(s) selection", "This option allows the user to select specific comparisons of interest",
+                                                                                  trigger = "hover")),
+                                    conditionalPanel(condition = "input.compSelect == true",
+                                                     uiOutput("Comparison2")),
+                                    uiOutput("dgeModSelection"),
+                                    br(),
+                                    div(style = "display:inline-block", checkboxInput("uploadModules", strong("Upload modules", style = "color:#456dae"), FALSE)),
+                                    div(style = "display:inline-block", infoPopup("Upload modules", "Allows the user to provide their own list of modules (CSV) to plot. The CSV file should contain a single column named 'Transcript.ID' or 'Gene.Symbol', 
+                                                      depending on whether the list provided is the PROBE ID's or gene Gene.Symbols.", placement = "right", trigger = "hover")),
+                                    conditionalPanel(condition = "input.uploadModules",
+                                                     fileInput('modSelect', '', multiple = FALSE, accept=c(".csv"))
+                                    ),
+                                    filterOptsUI("modDgeMap"),
+                                    br(),
+                                    div(style = "display:inline-block", checkboxInput("LMMdeleterows", "Delete all zero rows", FALSE)),
+                                    div(style = "display:inline-block", infoPopup("Delete all zero rows", 'Rows with all zeros (all white rows) will be deleted from the heat map.',
+                                                                                  placement = "right", trigger = "hover")),
+                                    br(),
+                                    checkboxInput("modDgeCluster", "Cluster rows", FALSE),
+                                    checkboxInput("colCluster","Cluster columns", FALSE),
+                                    br(),
+                                    graphOptionsUI("modDgeGraphOptions", varType = "modules")
+                                ),
+                                box(title = "Module DGE Heatmap", width = 8, status = "primary", solidHeader = FALSE,
+                                    downloadButton('downloadModDgeData', 'Download Data'),
+                                    downloadButton('downloadModDgeMap', 'Download Figure'),
+                                    plotOutput("modDgeMap")
+                                )
+                              )
+                     )
               )
             )
     ),
-    
-    tabItem(tabName = "genelistmaker",
-            fluidRow(
-              uiOutput("dgeTabs")
-            )
-    ),
-    
     tabItem(tabName = "qusage",
             fluidRow(
               tabBox(title = "Qusage Results", width = 12, id = "qusResults",
@@ -375,6 +498,8 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadSigComps", "Download Table"),
+                                    br(),
+                                    br(),
                                     DTOutput('CompOverview')
                                 )
                               )
@@ -384,7 +509,7 @@ body <-  dashboardBody(
                                 box(title = "Filtering/Plotting Options", width = 4, status = "primary", solidHeader = FALSE,
                                     div(style = "display:inline-block", uiOutput("Comparisons1")),
                                     div(style = "display:inline-block", infoPopup("Comparisons", "The user may select up to five comparisons.", placement = "right",
-                                    trigger = "click")),
+                                    trigger = "hover")),
                                     uiOutput("PaloOrFirst1"),
                                     checkboxInput("only_annotated", strong("Plot only annotated modules"), FALSE),
                                     checkboxInput("showAnnotated", strong("Show annotations on plot"), FALSE),
@@ -395,13 +520,14 @@ body <-  dashboardBody(
                                     conditionalPanel(condition = "input.graphics6",
                                                      div(style = "display:inline-block",uiOutput("ColorChoice")), 
                                                      div(style = "display:inline-block",helpPopup("Help Message", "The order of the colors corresponds to the order in the legend, not the order selected.",
-                                                                                                  placement = "right", trigger = "click")),
+                                                                                                  placement = "right", trigger = "hover")),
                                                      sliderInput("PlotWidth1", "Plot Width", min = 500, max = 5000, value = 800, step = 100),
                                                      numericInput("PlotRes1", "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1))
                                 ),
                                 div(id = "fcPlot", style = "overflow-x: auto", 
                                     box(title = "FC Plot", width = 12, status = "primary", solidHeader = FALSE,
                                         downloadButton("downloadPlot2", "Download Figure"),
+                                        br(),
                                         plotOutput("foldchange1")
                                     )
                                 )
@@ -413,6 +539,8 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Table", width = 7, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadTable2", "Download Table"),
+                                    br(),
+                                    br(),
                                     DTOutput('MultipleCompTab')
                                 )
                               )
@@ -435,11 +563,14 @@ body <-  dashboardBody(
                                        div(id = "indFcPlot", style = "overflow-x: auto",
                                            box(title = "FC Plot", width = 12, status = "primary", solidHeader = FALSE,
                                                downloadButton("downloadPlot3", "Download Figure"),
+                                               br(),
                                                plotOutput('GeneSetPlot')
                                            )
                                        ),
                                        box(title = "Results Table", width = NULL, status = "primary", solidHeader = FALSE,
                                            downloadButton("downloadTable3", "Download Table"),
+                                           br(),
+                                           br(),
                                            DTOutput('GeneSetTab')
                                        )
                                 )
@@ -460,6 +591,8 @@ body <-  dashboardBody(
                                   ),
                                   box(title = "Results Overview", 
                                       downloadButton("downloadSigCompsR", "Download Table"),
+                                      br(),
+                                      br(),
                                       DTOutput('CompOverviewR')
                                   )
                                 )
@@ -478,6 +611,8 @@ body <-  dashboardBody(
                                   ),
                                   box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                       downloadButton('downloadFC', 'Download Table'),
+                                      br(),
+                                      br(),
                                       DTOutput("FlowOverview")
                                   )
                                 )
@@ -491,6 +626,8 @@ body <-  dashboardBody(
                                   box(title = "Flow List", width = 8, status = "primary", solidHeader = FALSE,
                                       helpText("Right click on hyperlinks to open in new window"),
                                       downloadButton('downloadFL', 'Download Table'),
+                                      br(),
+                                      br(),
                                       DTOutput("flowlisttable")
                                   )
                                 )
@@ -507,18 +644,22 @@ body <-  dashboardBody(
                                       checkboxInput("FlowTransform","lg2 Transform",FALSE),
                                       checkboxInput("flowbox","Box Plot View",FALSE),
                                       checkboxInput("FlowSamples","Individual curves",FALSE),
-                                      downloadButton('downloadFlowData', 'Download Data')
+                                      downloadButton('downloadFlowData', 'Download Data'),
+                                      br()
                                   ),
                                   column(width = 8,
                                          fluidRow(
                                            box(title = "Figure", width = 12, status = "primary", solidHeader = FALSE,
                                                downloadButton('downloadFlowPlot', 'Download Figure'),
+                                               br(),
                                                plotOutput("FlowPlot")
                                            )
                                          ),
                                          fluidRow(
                                            box(title = "Table", width = 12, status = "primary", solidHeader = FALSE,
                                                downloadButton('downloadFlowSummaries','Download Table'),
+                                               br(),
+                                               br(),
                                                DTOutput("FlowPlotSummary")
                                            ) 
                                          )
@@ -565,6 +706,8 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('downloadFC2', 'Download Table'),
+                                    br(),
+                                    br(),
                                     DTOutput("MetabOverview")
                                 )
                               )
@@ -580,6 +723,8 @@ body <-  dashboardBody(
                                 box(title = "Metabolite List", width = 8, status = "primary", solidHeader = FALSE,
                                     helpText("Right click on hyperlinks to open in new window"),
                                     downloadButton('downloadME', 'Download Table'),
+                                    br(),
+                                    br(),
                                     DTOutput("metablisttable")
                                 )
                               )
@@ -596,14 +741,19 @@ body <-  dashboardBody(
                                     checkboxInput("MetabSamples","Individual curves",FALSE),
                                     helpText("Options for 2nd Plot:"),
                                     checkboxInput("metabbox","Box Plot View",FALSE),
-                                    downloadButton('downloadMetabData', 'Download Data')
+                                    downloadButton('downloadMetabData', 'Download Data'),
+                                    br()
                                 ),
                                 box(title = "Figures", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('downloadMetabPlot', 'Download Figure'),
+                                    br(),
                                     plotOutput("MetabPlot"),
                                     downloadButton('downloadMetabPlot2', 'Download Figure'),
+                                    br(),
                                     plotOutput("MetabPlot2"),
                                     downloadButton('downloadMetabSummaries','Download Table'),
+                                    br(),
+                                    br(),
                                     DTOutput("MetabPlotSummary")
                                 )
                               )
@@ -614,13 +764,13 @@ body <-  dashboardBody(
                                     div(style = "display:inline-block", actionButton("go4", "Plot")),
                                     div(style = "display:inline-block", infoPopup("Plot", 'The heatmap will not update until the "Plot" button is clicked.
                                                                                   This allows the user to make multiple adjustments at once, without having to wait for 
-                                                                                  each individual adjustment to update on the heatmap.', placement = "right", trigger = "click")),
+                                                                                  each individual adjustment to update on the heatmap.', placement = "right", trigger = "hover")),
                                     uiOutput("CompM2"),
                                     filterOptsUI("metabHeatmap"),
                                     uiOutput("normMetab"),
                                     div(style = "display:inline-block", checkboxInput("metabRowCluster", strong("Row Cluster"), value = FALSE)),
                                     div(style = "display:inline-block", infoPopup("Row Cluster", "Based on the PC performance, it might not be recommended to cluster the rows if the number of rows exceed 7000",
-                                                                                  placement = "right", trigger = "click")),
+                                                                                  placement = "right", trigger = "hover")),
                                     br(),
                                     maxValuesUI("metabMaxValues"),
                                     br(),
@@ -632,6 +782,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Heatmap", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadHeatmapm"),
+                                    br(),
                                     plotOutput("heatmapm")
                                 )
                               )
@@ -655,6 +806,8 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Overview", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('downloadOverviewCorrTable', 'Download Table'),
+                                    br(),
+                                    br(),
                                     DTOutput("corrOverview")
                                 )
                               )
@@ -684,11 +837,12 @@ body <-  dashboardBody(
                                                      uiOutput("subsetcorr")),
                                     div(style = "display:inline-block", checkboxInput("rowclustcorr", strong("Row cluster"),FALSE)),
                                     div(style = "display:inline-block",infoPopup("Row Cluster", "Based on the PC performance, it might not be recommended to cluster the rows if the number of rows exceed 7000",
-                                                                                 placement = "right", trigger = "click")),
+                                                                                 placement = "right", trigger = "hover")),
                                     checkboxInput("colclustcorr", strong("Column cluster"), FALSE),
                                     checkboxInput("colorRange", strong("Force Color Range From -1 to 1"), FALSE),
                                     div(style = "display:inline-block", checkboxInput("graphics9", strong("Graphing options", style = "color:#456dae"), TRUE)),
-                                    div(style = "display:inline-block", helpPopup("Graphing options:", "These options allow the user to make adjustments to the plot (i.e. width and height).")),
+                                    div(style = "display:inline-block", helpPopup("Graphing options:", "These options allow the user to make adjustments to the plot (i.e. width and height).",
+                                                                                  trigger = "hover")),
                                     conditionalPanel(condition = "input.graphics9",
                                                      sliderInput("PlotWidth4", "Plot Width", min = 500, max = 5000, value = 800, step = 100),
                                                      sliderInput("PlotHeight4", "Plot Height", min = 500, max = 5000, value = 600, step = 100),
@@ -699,7 +853,9 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Heatmap", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('download_heatmap_data', "Download Data"),
+                                    br(),
                                     downloadButton('download_corr_heatmap', "Download Figure"),
+                                    br(),
                                     plotOutput("correlations_plotOverview")
                                 )
                               )
@@ -737,7 +893,9 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Plot", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('download_plot_data', "Download Data"),
+                                    br(),
                                     downloadButton('download_corr_plot', "Download Figure"),
+                                    br(),
                                     plotOutput("correlations_plot")
                                 )
                               )
@@ -762,6 +920,8 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Results Table", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('download_data', "Download Table"),
+                                    br(),
+                                    br(),
                                     DTOutput("correlation_table")
                                 )
                               )
@@ -790,7 +950,9 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Plot", width = 8, status = "primary", solidHeader = FALSE,
                                     downloadButton('download_scatter_data', "Download Data"),
+                                    br(),
                                     downloadButton('download_scatter', "Download Figure"),
+                                    br(),
                                     plotOutput("correlations_scatter_plot")
                                 )
                               )

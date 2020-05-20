@@ -14,7 +14,7 @@ library(data.table)
 library(pca3d)
 library(shinyjs)
 library(stringr)
-library(dplyr)
+library(tidyverse)
 library(shinydashboard)
 library(DT)
 
@@ -274,7 +274,8 @@ filterOptsUI <- function(id){
   
   tagList(
     div(style = "display:inline-block", checkboxInput(ns("TSoptions"), strong("Testing and fold change subsetting options", style = "color:#456dae"), FALSE)),
-    div(style = "display:inline-block", helpPopup("Testing and fold change subsetting options", "These options allow the user to filter on signifance threshold and fold change.")),
+    div(style = "display:inline-block", helpPopup("Testing and fold change subsetting options", "These options allow the user to filter on signifance threshold and fold change.",
+                                                  trigger = "hover")),
     conditionalPanel(condition = condCall1,
                      selectInput(ns("correction_method"),"Multiple testing correction:",
                                  c("FDR","Bonferroni","Raw"),"Raw"),
@@ -467,14 +468,16 @@ subsetAndOrderUI <- function(id){
   
   tagList(
     div(style = "display:inline-block", checkboxInput(ns("subsetCols"),strong("Subset column options", style = "color:#456dae"),FALSE)),
-    div(style = "display:inline-block", helpPopup("Subset column options", "These options allow the user to plot a subset of the samples within the expression data set.")),
+    div(style = "display:inline-block", helpPopup("Subset column options", "These options allow the user to plot a subset of the samples within the expression data set.",
+                                                  trigger = "hover")),
     conditionalPanel(condition = condCall1,
                      uiOutput(ns('subsetVars')),
                      uiOutput(ns('subsetVals'))
     ),
     br(),
     div(style = "display:inline-block", checkboxInput(ns('orderCols'), strong("Ordering column options", style = "color:#456dae"), FALSE)),
-    div(style = "display:inline-block", helpPopup("Ordering column options", "These options allow the user to specify column ordering by column variable.")),
+    div(style = "display:inline-block", helpPopup("Ordering column options", "These options allow the user to specify column ordering by column variable.",
+                                                  trigger = "hover")),
     conditionalPanel(condition = condCall2,
                      uiOutput(ns('orderingVars'))
     )
@@ -588,14 +591,15 @@ colClusterUI <- function(id){
   
   tagList(
     div(style = "display:inline-block", checkboxInput(ns('clusterOptions'), strong("Clustering column options", style = "color:#456dae"), FALSE)),
-    div(style = "display:inline-block", helpPopup("Cluster column options", "These options allow the user to cluster the samples and label the groups they are clustered in.")),
+    div(style = "display:inline-block", helpPopup("Cluster column options", "These options allow the user to cluster the samples and label the groups they are clustered in.",
+                                                  trigger = "hover")),
     conditionalPanel(condition = condCall1,
                      checkboxInput(ns("colCluster"),"Cluster samples (columns)",FALSE),
                      checkboxInput(ns('clusterGroups'), "Show cluster groups", FALSE),
                      conditionalPanel(condition = condCall2,
                                       div(style = "display:inline-block", uiOutput(ns('clusterCuts')))),
                                       div(style = "display:inline-block", infoPopup("Cluster Cuts", "Optimal number calculated using Dunn's Index.",
-                                                                                    placement = "right", trigger = "click")))
+                                                                                    placement = "right", trigger = "hover")))
   )
 }
 
@@ -718,7 +722,7 @@ uploadVarsUI <- function(id, varType){
   
   tagList(
     div(style = "display:inline-block", checkboxInput(ns("uploadVars"), strong(uploadType, style = "color:#456dae"), FALSE)),
-    div(style = "display:inline-block", infoPopup(uploadType, uploadDescription, placement = "right", trigger = "click")),
+    div(style = "display:inline-block", infoPopup(uploadType, uploadDescription, placement = "right", trigger = "hover")),
     conditionalPanel(condition = condCall1,
                      fileInput(ns('varSelect'), '', multiple = FALSE, accept=c(".csv")),
                      div(style = "display:inline-block",checkboxInput(ns("rowCluster"), strong("Row cluster"), FALSE)),
@@ -766,7 +770,8 @@ graphOptionsUI <- function(id, varType = "transcripts"){
   if(varType == "modules"){
     return(tagList(
       div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:#456dae"), FALSE)),
-      div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).")),
+      div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).",
+                                                    trigger = "hover")),
       conditionalPanel(condition = condCall1,
                        sliderInput(ns('graphWidth'), "Plot width", min = 400, max = 2000, value = 750, step = 25),
                        sliderInput(ns('graphHeight'), "Plot height", min = 400, max = 2000, value = 800, step = 25),
@@ -779,7 +784,8 @@ graphOptionsUI <- function(id, varType = "transcripts"){
   }
   return(tagList(
     div(style = "display:inline-block", checkboxInput(ns("graphOptions"), strong("Graphing options", style = "color:#456dae"), FALSE)),
-    div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).")),
+    div(style = "display:inline-block", helpPopup(ns("Graphing options"), "These options allow the user to make adjustments to the plot (i.e. width and height).",
+                                                  trigger = "hover")),
     conditionalPanel(condition = condCall1,
                      sliderInput(ns('graphWidth'), "Plot width", min = 400, max = 2000, value = 750, step = 25),
                      sliderInput(ns('graphHeight'), "Plot height", min = 400, max = 2000, value = 650, step = 25),

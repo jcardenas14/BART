@@ -1,4 +1,4 @@
-**<span class="underline">B</span>**io-statistical **<span class="underline">A</span>**nalysis **<span class="underline">R</span>**eporting **<span class="underline">T</span>**ool
+**B**io-statistical **A**nalysis **R**eporting **T**ool
 ===================================================================================================================================================================================
 
 ------------------------------------------------------------------------

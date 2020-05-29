@@ -48,22 +48,20 @@ filterOpts <- function(input, output, session, data, comparison, data.type = NUL
       colnames(results) <- c("Metab.Variables","Log2FC", "Test.Statistic", "P.Value", "FDR", "Bonferroni")
     }
     results <- data.frame(results)
-    if(input$correction_method == "Raw"){
-      results <- results[which(results$P.Value <= input$alphalevel),]
-      results <- results[order(results$P.Value, decreasing = FALSE),]
-    }
-    if(input$correction_method == "FDR"){
-      results <- results[which(results$FDR <= input$alphalevel),]
-      results <- results[order(results$FDR, decreasing = FALSE),]
-    }
-    if(input$correction_method == "Bonferroni"){
-      results <- results[which(results$Bonferroni <= input$alphalevel),]
-      results <- results[order(results$Bonferroni, decreasing = FALSE),]
-    }
+    results <- results %>%
+      filter(
+        case_when(input$correction_method == "Raw" ~ P.Value <= input$alphalevel,
+                  input$correction_method == "FDR" ~ FDR <= input$alphalevel,
+                  TRUE ~ Bonferroni <= input$alphalevel)
+      ) %>%
+      arrange(P.Value)
     if(input$showfc){
-      if(input$sign=="Both"){results <- results[which(abs(results$Log2FC) > input$fcval),]}
-      if(input$sign=="+"){results <- results[which(results$Log2FC > input$fcval),]}
-      if(input$sign=="-"){results <- results[which(results$Log2FC < -input$fcval),]}
+      results <- results %>%
+        filter(
+          case_when(input$sign == "Both" ~ abs(Log2FC) >= input$fcval,
+                    input$sign == "+" ~ Log2FC >= input$fcval,
+                    TRUE ~ Log2FC <= -input$fcval)
+        )
     }
     if(nrow(results) == 0){
       if(data.type == "genes"){
@@ -77,66 +75,46 @@ filterOpts <- function(input, output, session, data, comparison, data.type = NUL
         names(results) <- "Metab.Variables"
       }
     }
-  } 
-  if(data.type == "geneSets") {
+  } else if(data.type == "geneSets") {
     if(is.null(results)){return(NULL)}
     if(length(comparison()) < 1){return(NULL)}
-    results <- results[which(results$Comparison %in% comparison()),]
-    first_comp <- results[which(results$Comparison %in% comparison()[1]),]
+    results <- results %>% filter(Comparison %in% comparison())
+    first_comp <- results %>% filter(Comparison %in% comparison()[1])
     if(input$showfc){
-      if(input$sign == "Both"){
-        first_cut <- unique(first_comp[which(abs(first_comp$Log2FC) >= input$fcval), ]$pathway.name)
-        palo_cut <- unique(results[which(abs(results$Log2FC) >= input$fcval), ]$pathway.name)
-      } else if(input$sign == "+"){
-        first_cut <- unique(first_comp[which(first_comp$Log2FC >= input$fcval), ]$pathway.name)
-        palo_cut <- unique(results[which(results$Log2FC >= input$fcval), ]$pathway.name)
-      } else if(input$sign == "-"){
-        first_cut <- unique(first_comp[which(first_comp$Log2FC <= -input$fcval), ]$pathway.name)
-        palo_cut <- unique(results[which(results$Log2FC <= -input$fcval), ]$pathway.name)
-      }
-      if(length(paloOrFirst()) > 0){
-        if(length(comparison()) == 1 || paloOrFirst() == 1){
-          results <- results[which(results$pathway.name %in% palo_cut), ]
-        } else{
-          results <- results[which(results$pathway.name %in% first_cut), ]
-        } 
-      } else{
-        if(length(comparison()) == 1){
-          results <- results[which(results$pathway.name %in% palo_cut), ]
-        } else{
-          results <- results[which(results$pathway.name %in% first_cut), ]
-        } 
-      }
+      first_cut <- unique(first_comp %>% 
+                            filter(
+                              case_when(input$sign == "Both" ~ abs(Log2FC) >= input$fcval,
+                                        input$sign == "+" ~ Log2FC >= input$fcval,
+                                        TRUE ~ Log2FC <= -input$fcval)
+                            ) %>% pull(pathway.name))
+      palo_cut <- unique(results %>% 
+                           filter(
+                             case_when(input$sign == "Both" ~ abs(Log2FC) >= input$fcval,
+                                       input$sign == "+" ~ Log2FC >= input$fcval,
+                                       TRUE ~ Log2FC <= -input$fcval)
+                           ) %>% pull(pathway.name))
+      results <- results %>% 
+        filter(
+          case_when(length(comparison()) == 1 || (length(paloOrFirst()) > 0 & paloOrFirst() == 1) ~ pathway.name %in% palo_cut,
+                    TRUE ~ pathway.name %in% first_cut)
+        )
     }
-    if(input$correction_method == "Raw"){
-      pval <- "p.Value"
-    } else if(input$correction_method == "FDR"){
-      pval <- "FDR"
-    } else if(input$correction_method == "Bonferroni"){
-      pval <- "Bonf"
+    
+    pval <- case_when(input$correction_method == "Raw" ~ "p.Value", input$correction_method == "FDR" ~ "FDR", TRUE ~ "Bonf")
+    keep <- unique(results %>%
+                     filter(
+                       case_when(length(comparison()) == 1 || (length(paloOrFirst()) > 0 & paloOrFirst() == 1) ~ !!sym(pval) <= input$alphalevel,
+                                 TRUE ~ (Comparison == comparison()[1] & !!sym(pval) <= input$alphalevel))
+                     ) %>% pull(pathway.name))
+    if(length(keep) == 0){
+      return(NULL)
     }
-    if(length(paloOrFirst()) > 0){
-      if(paloOrFirst() == 1 || length(comparison()) == 1){
-        keep <- unique(results[which(results[[pval]] <= input$alphalevel),]$pathway.name)
-      } else {
-        results1 <- results[which(results$Comparison %in% comparison()[1]),]
-        keep <- unique(results1[which(results1[[pval]] <= input$alphalevel),]$pathway.name)
-      } 
-    } else{
-      if(length(comparison()) == 1){
-        keep <- unique(results[which(results[[pval]] <= input$alphalevel),]$pathway.name)
-      } else {
-        results1 <- results[which(results$Comparison %in% comparison()[1]),]
-        keep <- unique(results1[which(results1[[pval]] <= input$alphalevel),]$pathway.name)
-      } 
-    }
-    if(length(keep) == 0){return(NULL)}
-    results <- results[which(results$pathway.name %in% keep),]
-    results.temp <- list()
+    results <- results %>% filter(pathway.name %in% keep)
+    results.temp <- vector("list", length(comparison()))
     for(i in 1:length(comparison())){
-      results.temp[[i]] <- results[which(results$Comparison %in% comparison()[i]),]
+      results.temp[[i]] <- results %>% filter(Comparison %in% comparison()[i])
       if(i == 1){
-        results.temp[[i]] <- results.temp[[i]][order(results.temp[[i]]$Log2FC, decreasing = TRUE),]
+        results.temp[[i]] <- results.temp[[i]] %>% arrange(desc(Log2FC))
       } else {
         results.temp[[i]] <- results.temp[[i]][match(results.temp[[1]]$pathway.name, results.temp[[i]]$pathway.name, nomatch = 0),]
       }
@@ -144,23 +122,20 @@ filterOpts <- function(input, output, session, data, comparison, data.type = NUL
       results.temp[[i]] <- cbind(Index, results.temp[[i]])
     }
     results <- do.call("rbind", results.temp)
-    results[,2] = factor(results[,2], levels = unique(results[,2]))
-    sig = which(results[[pval]] <= input$alphalevel)
+    results[,2] <- factor(results[,2], levels = unique(results[,2]))
     results$SIG = "Not Significant"
-    results$SIG[sig] = "Significant"
-  }
-  if(data.type == "percents"){
+    results$SIG[which(results[[pval]] <= input$alphalevel)] = "Significant"
+  } else if(data.type == "percents"){
     dataset <- data()
-    nam <- colnames(dataset)
-    index <- grep("^P.Value",nam)
-    p.names <- gsub("P.Value.","",nam[index])
+    index <- grep("^P.Value",colnames(dataset))
+    p.names <- gsub("P.Value.","",colnames(dataset)[index])
     y <- as.matrix(dataset[,index, drop = FALSE])
     if(input$correction_method == "Raw"){
-      dat<-y
+      dat <- y
     } else if(input$correction_method == "FDR"){
-      dat<-as.matrix(dataset[,grep("FDR.P.Value", colnames(dataset)), drop = FALSE])
-    } else if(input$correction_method == "Bonferroni"){
-      dat<-apply(y,2,p.adjust,method="bonferroni")
+      dat <- as.matrix(dataset[,grep("FDR.P.Value", colnames(dataset)), drop = FALSE])
+    } else{
+      dat <- apply(y, 2, p.adjust, method="bonferroni")
     }
     dat[dat <= input$alphalevel] <- 2
     dat[dat != 2] <- 0
@@ -170,36 +145,25 @@ filterOpts <- function(input, output, session, data, comparison, data.type = NUL
     dataset.fcindex <- dataset[,fcindex, drop = FALSE]
     if(input$showfc == TRUE){
       dataset.fcindex[dataset.fcindex < input$fcval & dataset.fcindex > -input$fcval] <- 0
-      sign.dat <- sign(dataset.fcindex)
-      dat <- sign.dat*dat
+      dat <- sign(dataset.fcindex)*dat
       if(input$sign == "+"){
         dat[dat == -1] <- 0
-      }
-      if(input$sign == "-"){
+      } else{
         dat[dat == 1] <- 0
       }
     } else {
-      sign.dat <- sign(dataset.fcindex)
-      dat <- sign.dat*dat
+      dat <- sign(dataset.fcindex)*dat
     }
     dat <- data.frame(cbind(Transcript.ID = as.character(dataset$Transcript.ID),dat))
-    dat <- merge(dat, geneList(), by = "Transcript.ID")
+    dat <- inner_join(dat, geneList(), by = "Transcript.ID")
     dat$Transcript.ID <- NULL
-    count_matrix <- list()
-    for(i in 1:length(index)){
-      count_matrix[[i]] <- aggregate(as.formula(paste(names(dat)[i],"~","Module",sep="")),data=dat,sum.custom, na.action = na.pass)
-      rownames(count_matrix[[i]]) <- as.character(count_matrix[[i]]$Module)
-      count_matrix[[i]]$Module <- NULL
-    }
-    count_matrix <- do.call(cbind, count_matrix)
+    count_matrix <- data.frame(dat %>% group_by(Module) %>% summarise_all(sum.custom))
+    rownames(count_matrix) <- count_matrix$Module
+    count_matrix$Module <- NULL
     freq <- data.frame(table(geneList()$Module))$Freq
     names(freq) <- data.frame(table(geneList()$Module))$Var1
     freq.matched <- freq[match(rownames(count_matrix), names(freq), nomatch = 0)]
     prop_matrix <- count_matrix/freq.matched
-    missingMods <- names(freq)[which(!names(freq) %in% names(freq.matched))]
-    missingData <- data.frame(matrix(0,nrow = length(missingMods), ncol = ncol(prop_matrix)))
-    rownames(missingData) <- missingMods
-    colnames(missingData) <- colnames(prop_matrix)
     colnames(prop_matrix) <- p.names
     prop_matrix2 <- prop_matrix
     prop_matrix2[prop_matrix < .1 & prop_matrix > -.1] <- 0

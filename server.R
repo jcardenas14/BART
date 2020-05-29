@@ -32,9 +32,8 @@ shinyServer(function(input,output, session){
     list.files("data")
   })
   
-  output$exampleData <- renderUI({
-   selectizeInput("exampleData", "Select example BART results file for Demo:", choices = list.projects(), multiple = TRUE, selected = NULL,
-                  options = list(maxItems = 1))
+  observe({
+    updateSelectizeInput(session,"exampleData", "Select example BART results file for Demo:", choices = list.projects(), selected = NULL)
   })
   
   output$uploadExampleData <- renderUI({
@@ -270,7 +269,7 @@ shinyServer(function(input,output, session){
   })
 
 
-  output$designDataTable<- renderDT({
+  output$designTable <- renderDT({
     datatable(design()$des,
               class = "table-condensed",
               style = "bootstrap4",
@@ -287,13 +286,10 @@ shinyServer(function(input,output, session){
     }
   )
   
-  output$mainSummaryVar <- renderUI({
-    selectizeInput("summaryVar", "Main Variable for Summarization:", colnames(designForSummaryStats()), multiple = TRUE, selected = NULL,
-                   options = list(maxItems = 1))
-  })
-  
-  output$groupingVars <- renderUI({
-    selectizeInput("groupingVars", "Grouping variable(s)", colnames(designForSummaryStats()),multiple = TRUE, selected = NULL)
+  observe({
+    req(designForSummaryStats())
+    updateSelectizeInput(session,"summaryVar", "Main Variable for Summarization:", colnames(designForSummaryStats()), selected = NULL)
+    updateSelectizeInput(session,"groupingVars", "Grouping variable(s)", colnames(designForSummaryStats()),selected = NULL)
   })
   
   summaryTable <- reactive({
@@ -328,7 +324,7 @@ shinyServer(function(input,output, session){
     }
   )
 
-  output$summaryText<-renderUI({
+  output$summaryText <- renderUI({
     req(input$summaryVar)
     table_description <- paste0(strong("Table: "), "Summary Statistics for ", input$summaryVar)
     if(length(input$groupingVars) > 0){
@@ -423,10 +419,6 @@ output$Unsupervised <- renderMenu({
 
   #################################### Module Maps ############################
   
-  output$baylorModules <- renderUI({
-   checkboxInput("baylorModules", strong("Are plotted scores from Baylor modules?"), FALSE)
-  })
-  
   output$baseOrCtrl <- renderUI({
     if(is.null(values$scores.ctrl) & is.null(values$scores.base)){return(NULL)}
     if(!is.null(values$scores.ctrl) & !is.null(values$scores.base)){
@@ -499,9 +491,6 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
-  modWidth <- function(){modGraphParams()$width}
-  modHeight <- function(){modGraphParams()$height}
-  
   callModule(subsetAndOrderRenderUI, "modSubOrder", des = reactive(design()$des))
   callModule(clusterAssociationRenderUI, "modAssociation", data = reactive(design()$des))
   
@@ -547,7 +536,7 @@ output$Unsupervised <- renderMenu({
                              breaks=seq(-100,100,by=4))
                  }
     )
-  }, width = modWidth, height = modHeight)
+  }, width = function(){modGraphParams()$width}, height = function(){modGraphParams()$height})
   
   output$downloadModPlot3Other <- downloadHandler(
     filename = function() {paste(values$project.name, '_Longitudinal_ModuleMap','.png', sep = '')},
@@ -595,7 +584,7 @@ output$Unsupervised <- renderMenu({
     }
   )
   
-  output$cluster_output3Other <- renderTable({
+  output$modClusterTableFull <- renderTable({
     req(modGen_clustTab())
     modGen_clustTab()$table1
   }, include.rownames = FALSE, digits = 0)
@@ -718,9 +707,6 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
-  plotWidth <- function(){graphParams()$width}
-  plotHeight <- function(){graphParams()$height}
-  
   callModule(subsetAndOrderRenderUI, "unsupervisedSubOrder", des = reactive(heatmapData()$y$design.norm))
   callModule(clusterAssociationRenderUI, "unsupervisedAssociation", data = reactive(heatmapData()$y$design.norm))
   
@@ -777,7 +763,7 @@ output$Unsupervised <- renderMenu({
                              annRow = rowCluster()$rowAnnot,breaks=0)
                  }
     )
-  }, width = plotWidth, height = plotHeight)
+  }, width = function(){graphParams()$width}, height = function(){graphParams()$height})
   
   output$downloadHeatmap <- downloadHandler(
     filename = function() {paste('Gene_Level_Heatmap','.png', sep = '')},
@@ -834,7 +820,7 @@ output$Unsupervised <- renderMenu({
     paste("Optimal number of clusters =", clusterData()$opt_num )
   })
 
-  output$cluster_output4 <- renderTable({
+  output$clusterTableFull <- renderTable({
     req(gen_clustTab())
     gen_clustTab()$table1
   }, include.rownames = FALSE, digits = 0)
@@ -941,14 +927,6 @@ output$Unsupervised <- renderMenu({
     which(names(values$results.file) == paste0("P.Value.",input$diagnosticsComparison))
   })
   
-  output$diagnosticsComparison <- renderUI({
-    nam <- names(values$results.file)
-    index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    return(selectizeInput("diagnosticsComparison", "Comparison:", p.names, p.names[1], multiple = FALSE))
-  })
-  
   pcomp <- reactive({
     x <- sub("^", "P.Value.", input$comparison)
     x
@@ -988,15 +966,15 @@ output$Unsupervised <- renderMenu({
     )
   })
   
-  sel_genelists <- reactive({
-    if(length(grep("All", input$comparisons_download)) > 0){
+  multGeneLists <- reactive({
+    if(length(grep("All", input$comparisonsDownload)) > 0){
       nam <- names(values$results.file)
       index <- grep("^P.Value",nam)
       p.names <- nam[index]
       comps <- gsub("P.Value.", "", p.names)
     }
     else{
-      comps <- input$comparisons_download
+      comps <- input$comparisonsDownload
     }
     x.all <- list()
     for(i in 1:length(comps)){
@@ -1007,7 +985,7 @@ output$Unsupervised <- renderMenu({
     return(x.all)
   })
 
-  sig_ind <- reactive({
+  dgeModuleDat <- reactive({
     if(!is.null(values$dge.gsets)){
       genes <- unlist(values$dge.gsets)
       gsetNames <- rep(names(values$dge.gsets), times = lapply(values$dge.gsets, length))
@@ -1020,11 +998,11 @@ output$Unsupervised <- renderMenu({
       }
       if(baylorMod() == TRUE){
         modnames <- unique(modinfo$Module)
-        modnum<-gsub("M","",modnames)
-        modvec<-as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
-        modmat<-matrix(modvec,ncol=2,byrow=T)
-        modordnum<-table(factor(modinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
-        mod_for_merge<-data.frame(Module=names(modordnum),Size=as.vector(modordnum))
+        modnum <- gsub("M","",modnames)
+        modvec <- as.numeric(unlist(strsplit(modnum,".",fixed=TRUE)))
+        modmat <- matrix(modvec,ncol=2,byrow=T)
+        modordnum <- table(factor(modinfo$Module,levels=modnames[order(modmat[,1],modmat[,2])],ordered=TRUE))
+        mod_for_merge <- data.frame(Module=names(modordnum),Size=as.vector(modordnum))
         prop_matrix <- dat$prop_matrix[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix), nomatch = 0),,drop = FALSE]
         prop_matrix2 <- dat$prop_matrix2[match(as.character(mod_for_merge$Module), rownames(dat$prop_matrix2), nomatch = 0),,drop = FALSE]
         z <- list(prop_matrix = prop_matrix, prop_matrix2 = prop_matrix2)
@@ -1037,23 +1015,29 @@ output$Unsupervised <- renderMenu({
     }
   })
   
-  ModMap_Comparison <- reactive({
+  dgeModuleMap <- reactive({
     numgen <- function(x){
-      d<-c()
-      odd<-2*(1:20)-1
-      if(length(x)==1){
-        return(odd[1:x])}
-      if(length(x)>1){
-        for(i in 1:length(x)){d<-c(d,odd[1:x[i]])}
-        return(d)}
+      d <- c()
+      odd <- 2*(1:20)-1
+      if(length(x) == 1){
+        return(odd[1:x])
+      }
+      if(length(x) > 1){
+        for(i in 1:length(x)){
+          d <- c(d,odd[1:x[i]])
+        }
+        return(d)
+      }
     }
     numgen2 <- function(x){
-      d<-c()
-      odd<-2*(1:8)-1
-      for (i in 1:length(x)){d<-c(d,rep(odd[9-i],x[i]))}
+      d <- c()
+      odd <- 2*(1:8)-1
+      for(i in 1:length(x)){
+        d <- c(d,rep(odd[9-i],x[i]))
+      }
       return(d)
     }
-    colorvar = sig_ind()$prop_matrix2[1:97,input$comparison]
+    colorvar <- dgeModuleDat()$prop_matrix2[1:97,input$comparison]
     colgrp <- findInterval(colorvar,seq(0,2,length.out=10))
     colfunc <- colorRampPalette(c("blue","white", "red"))
     collist <- colfunc(length(unique(colgrp)))
@@ -1064,15 +1048,15 @@ output$Unsupervised <- renderMenu({
       y = c(numgen2(c(2,3,6,16,15,20,20,15))),
       proportion = mycolors
     )
-    test<-ggplot(df2, aes(xmin=x-1,xmax=x+1,ymin=y-1,ymax=y+1),environment=environment())+
+    test <- ggplot(df2, aes(xmin=x-1,xmax=x+1,ymin=y-1,ymax=y+1),environment=environment())+
       theme(axis.ticks.x=element_blank(),axis.ticks.y=element_blank(),panel.grid.major = element_blank()
             ,panel.grid.minor = element_blank()
             ,panel.border = element_blank())+geom_rect(fill="white", colour="black")+
       scale_y_continuous(breaks=c(15,13,11,9,7,5,3,1), labels=c("M1","M2","M3","M4","M5","M6","M7","M7 (21-35)"),limits=c(0,40))+
       scale_x_continuous(breaks=(2*(1:20)-1),labels=1:20,limits=c(0,40))
     
-    test2<-test+coord_cartesian(xlim = c(0, 40), ylim=c(0, 16))
-    test3<-test2+geom_point(aes(x=x,y=y,colour=proportion,size=500))+
+    test2<-test + coord_cartesian(xlim = c(0, 40), ylim=c(0, 16))
+    test3<-test2 + geom_point(aes(x=x,y=y,colour=proportion,size=500))+
       scale_colour_gradient2(low="blue", high="red", guide="colorbar",midpoint=0, limits = c(-1,1))+ 
       theme(axis.title.x=element_blank(),axis.title.y=element_blank()) + scale_size_continuous(limits=c(1,500)) + 
       guides(size = FALSE) 
@@ -1081,16 +1065,16 @@ output$Unsupervised <- renderMenu({
   
   output$moduleMap <- renderUI({
     if(!input$baylorMods){return(NULL)}
-    plotOutput('modMap')
+    plotOutput('dgeModuleMap')
   })
   
-  output$modmaplmmres <- renderUI({
+  output$dgeModuleMapResolution <- renderUI({
     if(!input$baylorMods){return(NULL)}
-    numericInput('modmaplmmres', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1)
+    numericInput('dgeModuleMapResolution', "Plot resolution (for downloaded plot):", min = 72, max = 400, value = 72, step = 1)
   })
   
-  output$modMap <- renderPlot({
-    ModMap_Comparison()
+  output$dgeModuleMap <- renderPlot({
+    dgeModuleMap()
   }, width = 700, height = 190)
   
   output$baylorMods <- renderUI({
@@ -1098,16 +1082,16 @@ output$Unsupervised <- renderMenu({
     checkboxInput("baylorMods", strong("Are the provided gene sets baylor modules?"), FALSE)
   })
   
-  output$downloadModMap <- renderUI({
+  output$downloadDgeModMap <- renderUI({
     if(!input$baylorMods){return(NULL)}
-    downloadButton('downloadModuleMap', "Download Figure")
+    downloadButton('downloadDgeModuleMap', "Download Figure")
   })
   
-  output$downloadModuleMap <- downloadHandler(
-    filename = function() {paste('ModMap_Comparison','.png', sep = '')},
+  output$downloadDgeModuleMap <- downloadHandler(
+    filename = function() {paste('dgeModuleMap','.png', sep = '')},
     content = function(file){
-      png(file, width = (mod_map_lmm_res()/72)*700, height = (mod_map_lmm_res()/72)*190, res = mod_map_lmm_res())
-      print(ModMap_Comparison())
+      png(file, width = (input$dgeModuleMapResolution/72)*700, height = (input$dgeModuleMapResolution/72)*190, res = input$dgeModuleMapResolution)
+      print(dgeModuleMap())
       dev.off()
     }
   )
@@ -1127,19 +1111,19 @@ output$Unsupervised <- renderMenu({
     if(!is.null(values$dge.annots)){
       y <- values$dge.annots
       colnames(y) <- c("Gene.Set", "Annotation")
-      x <- full_join(x, y, by = "Gene.Set", all = TRUE)
+      x <- full_join(x, y, by = "Gene.Set")
     }
     return(x)
   })
 
-  output$dgeResultTable <-renderDT({
+  output$dgeResultTable <- renderDT({
     input$comparison
     y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison), "genes")
     if(!is.null(values$dge.gsets)){
       if(input$mergeGeneSets){
         x <- mergeDgeGeneSet()
         colnames(x)[2] <- "Transcript.ID"
-        y <- full_join(y, x, by = "Transcript.ID") %>%
+        y <- left_join(y, x, by = "Transcript.ID") %>%
           select(Transcript.ID, Gene.Symbol, Gene.Set, Annotation, everything())
       }
     }
@@ -1159,23 +1143,22 @@ output$Unsupervised <- renderMenu({
   })
 
   dgeData <- reactive({
-    input$comparison2
-    g <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparison2),"genes")
-    e <- values$exprs[match(g$Transcript.ID, rownames(values$exprs), nomatch = 0),]
-    g <- g[match(rownames(e), g$Transcript.ID, nomatch = 0),]
-    g$Gene.Symbol <- as.character(g$Gene.Symbol)
-    g$Transcript.ID <- as.character(g$Transcript.ID)
-    if(length(which(g$Gene.Symbol == "")) > 0){
-     rows <- g$Gene.Symbol
-     rows[which(rows == "")] <- g$Transcript.ID[which(rows == "")]
+    input$comparisonDgeHeatmap
+    genes <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparisonDgeHeatmap),"genes")
+    dat <- values$exprs[match(genes$Transcript.ID, rownames(values$exprs), nomatch = 0),]
+    genes <- genes[match(rownames(dat), genes$Transcript.ID, nomatch = 0),]
+    genes$Gene.Symbol <- as.character(genes$Gene.Symbol)
+    genes$Transcript.ID <- as.character(genes$Transcript.ID)
+    if(length(which(genes$Gene.Symbol == "")) > 0){
+     rows <- genes$Gene.Symbol
+     rows[which(rows == "")] <- genes$Transcript.ID[which(rows == "")]
     } else{
-     rows <- g$Gene.Symbol
+     rows <- genes$Gene.Symbol
     }
     if(input$dgePlotGeneSymbols){
-     rownames(e) <- make.unique(as.character(rows))
+     rownames(dat) <- make.unique(as.character(rows))
     }
-    z = list(g = e)
-    return(z)
+    return(dat)
   })
 
   output$test1<-renderUI({
@@ -1207,7 +1190,7 @@ output$Unsupervised <- renderMenu({
 
 
   dgeHeatmapData <-reactive({
-    dat <- dgeData()$g
+    dat <- dgeData()
     if (input$set1==1){#heatmapbase1
       if(ctrl()$id == TRUE){
         base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id & design()$des[,control.var()$id] != control.val()$id)]
@@ -1265,9 +1248,6 @@ output$Unsupervised <- renderMenu({
     return(params)
   })
   
-  dgePlotWidth <- function(){dgeGraphParams()$width}
-  dgePlotHeight <- function(){dgeGraphParams()$height}
-  
   callModule(subsetAndOrderRenderUI, "dgeSubOrder", des = reactive(dgeHeatmapData()$y$design.norm))
   
   dgeRowCluster <- eventReactive(input$go2, {
@@ -1290,7 +1270,7 @@ output$Unsupervised <- renderMenu({
     return(x)
   })
   
-  dgeOrderedData <- reactive({
+  dgeOrderedData <- eventReactive(input$go2,{
     dat <- callModule(subsetAndOrder, "dgeSubOrder", des = reactive(dgeHeatmapData()$y$design.norm), data = reactive(dgeRowCluster()$x), 
                       sampleAnnot = reactive(sample.id()$id))
     x <- dat$dat
@@ -1318,7 +1298,7 @@ output$Unsupervised <- renderMenu({
                              breaks=0)
                  }
     )
-  }, width = dgePlotWidth, height = dgePlotHeight)
+  }, width = function(){dgeGraphParams()$width}, height = function(){dgeGraphParams()$height})
   
   
   output$downloadDgeHeatmapFigure <- downloadHandler(
@@ -1365,33 +1345,20 @@ output$Unsupervised <- renderMenu({
     p.names <- nam[index]
     p.names <- gsub("P.Value.", "", p.names)
     updateSelectizeInput(session,"comparison", "Comparison:", choices = p.names, selected = p.names[1])
+    updateSelectizeInput(session,"comparisonModuleMat", "Comparison:", choices = p.names, selected = p.names[1])
+    updateSelectizeInput(session,"comparisonsDownload", "Comparison:", choices = c("All",p.names), selected = "All")
+    updateSelectizeInput(session,"diagnosticsComparison", "Comparison:", choices = p.names, selected = p.names[1])
+    updateSelectizeInput(session,"Vcomparison", "Comparison:", choices = p.names, selected = p.names[1])
   })
-
-  output$Comparison2 <- renderUI({
+  
+  observe({
+    req(values$results.file)
     nam <- names(values$results.file)
     index <- grep("^P.Value",nam)
     p.names <- nam[index]
     p.names <- gsub("P.Value.", "", p.names)
-    selectizeInput("comparison_LMM", "Comparison:", p.names, p.names[1], multiple = TRUE)
+    updateSelectizeInput(session, "comparisonDgeHeatmap", "Comparison:", choices = p.names, selected = input$comparison)
   })
-  
-  output$Comparison3 <- renderUI({
-    nam <- names(values$results.file)
-    index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    selectizeInput("comparison2", "Comparison:", p.names, p.names[1], multiple = FALSE)
-  })
-  
-  output$selectComps <- renderUI({
-    nam <- names(values$results.file)
-    index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    p.names <- c("All", p.names)
-    selectizeInput("comparisons_download", "Comparison:", p.names, p.names[1], multiple = TRUE)
-  })
-  
   
   output$pvalThreshCurve <- renderPlot({
     plot(pvalThreshData()$alpha,pvalThreshData()$raw,type="l",main="Multiple Testing Comparison Plot",col="black",xlim=c(0,1),ylim=c(0,1),xlab=expression(alpha),ylab="% of Total Probes in Gene List")
@@ -1422,23 +1389,15 @@ output$Unsupervised <- renderMenu({
     filename = function() {paste(input$ziptext,".zip", sep = "")},
     content = function(file) {
       file.names <- c()
-      for(i in 1:length(sel_genelists())){
-        #file.names[i] <- paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = "")
-        file.names[i] <- paste(names(sel_genelists())[i],".csv", sep = "")
-        #write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], "_", input$correction_method1, input$alphalevel1, ".csv", sep = ""), row.names = FALSE)
-        write.csv(sel_genelists()[[i]], file = paste(names(sel_genelists())[i], ".csv", sep = ""), row.names = FALSE)
+      for(i in 1:length(multGeneLists())){
+        file.names[i] <- paste(names(multGeneLists())[i],".csv", sep = "")
+        write.csv(multGeneLists()[[i]], file = paste(names(multGeneLists())[i], ".csv", sep = ""), row.names = FALSE)
       }
       zip(zipfile = file, files = file.names)
     },
     contentType = "application/zip"
   )
-
-  output$readme <-renderText({paste("The following reports are designed to investigate the results of Differential Gene Expression Analysis.
-                                    Below is a summary by a biostatistics team member of the statistical model that was conducted for this project.
-                                    The following tabs provide the user with the ability to create their own gene lists for any comparison the analysis conducted.
-                                    In the DGE: Gene Lists tab, the user can create the list using raw p-value thresholds or multiple testing corrections by tweaking the inputs on the left hand side of interface.
-                                    In addition to the list, a module map of the first Seven rounds of the Baylor Modules is produced.  The percentages are calculated by taking the significant probes in the current gene list
-                                    and calculating the percentages of significant probes that are significantly up or down regulated.") })
+  
   output$intro <-renderText({paste("Number of probes in Gene list by method and alpha parameter.")})
 
   modDgeGraphParams <- reactive({
@@ -1447,9 +1406,6 @@ output$Unsupervised <- renderMenu({
                    treeHeight = params$treeHeight, resolution = params$resolution,circleSize = params$circleSize)
     return(params)
   })
-  
-  modDgePlotWidth <- function(){modDgeGraphParams()$width}
-  modDgePlotHeight <- function(){modDgeGraphParams()$height}
   
   output$dgeModSelection <- renderUI({
     if(!input$baylorMods){return(NULL)}
@@ -1467,7 +1423,7 @@ output$Unsupervised <- renderMenu({
   })
   
   modDgeData <- eventReactive(input$goModDge,{
-    dat <- sig_ind()$prop_matrix2*100
+    dat <- dgeModuleDat()$prop_matrix2*100
     if(!is.null(values$dge.annots)){
      annots <- values$dge.annots[match(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], 
                                        as.character(values$dge.annots[,1]), nomatch = 0),]
@@ -1477,7 +1433,7 @@ output$Unsupervised <- renderMenu({
     ddm <- NA
     colddm <- NA
     if(input$compSelect){
-      dat <- dat[,match(input$comparison_LMM, colnames(dat), nomatch = 0), drop = FALSE]
+      dat <- dat[,match(input$comparisonModuleMat, colnames(dat), nomatch = 0), drop = FALSE]
     }
     if(baylorMod()){
      if(input$dgeModuleSelection == "Only Annotated"){
@@ -1524,7 +1480,7 @@ output$Unsupervised <- renderMenu({
                              color = color.heatmap(),breaks=seq(-100,100,by=4))
                  }
     )
-  }, width = modDgePlotWidth, height = modDgePlotHeight)
+  }, width = function(){modDgeGraphParams()$width}, height = function(){modDgeGraphParams()$height})
   
   output$downloadModDgeMap <- downloadHandler(
     filename = function() {paste(values$project.name,"_LMM_ModuleMap",'_',input$correction_method1,input$alphalevel1,'.png', sep='')},
@@ -1537,7 +1493,6 @@ output$Unsupervised <- renderMenu({
     }
   )
 
-
   output$downloadModDgeData <- downloadHandler(
 
     filename = function() {paste(values$project.name,"_LMM_ModuleData",'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
@@ -1545,24 +1500,16 @@ output$Unsupervised <- renderMenu({
       write.csv(modDgeData()$dat, file)
     }
   )
-
-  output$vennComparison <- renderUI({
-    nam <- names(values$results.file)
-    index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    selectizeInput("Vcomparison", "Comparison:", p.names, p.names[1], multiple = TRUE)
+  
+  observe({
+    req(input$Vcomparison)
+    updateSelectizeInput(session, "Include", "Include:", choices = input$Vcomparison, selected = input$Vcomparison[1:length(input$Vcomparison)])
   })
-
-  output$include <- renderUI({
-    n = length(input$Vcomparison)
-    Vcomparison = input$Vcomparison
-    selectizeInput("Include", "Include:", Vcomparison, Vcomparison[1:n], multiple = TRUE)
-  })
-
-  output$exclude <- renderUI({
+  
+  observe({
+    req(input$Include)
     comparisons <- setdiff(input$Vcomparison, input$Include)
-    selectizeInput("Exclude", "Exclude:", comparisons, comparisons[1], multiple = TRUE)
+    updateSelectizeInput(session,"Exclude", "Exclude:", choices = comparisons, selected = comparisons[1])
   })
 
   venndata <- reactive({
@@ -1623,7 +1570,6 @@ output$Unsupervised <- renderMenu({
       y <- which(values$results.file[,1] %in% Venn.intersection())
       cols <- list()
       for(i in 1:n){
-        #cols[[i]] <- grep(fcomp[i], colnames(values$results.file))
         cols[[i]] <- match(fcomp[[i]], colnames(values$results.file))
       }
     }
@@ -1702,21 +1648,7 @@ output$Unsupervised <- renderMenu({
     names(dummy) <- "Transcript.ID"
     if(identical(genelist2(),dummy)){return(NULL)}
     color.choices = c("blue", "green", "red", "orange","purple")
-    if(length(venndata()) == 1){
-      color.choices = color.choices[1]
-    }
-    if(length(venndata()) == 2){
-      color.choices = color.choices[1:2]
-    }
-    if(length(venndata()) == 3){
-      color.choices = color.choices[1:3]
-    }
-    if(length(venndata()) == 4){
-      color.choices = color.choices[1:4]
-    }
-    if(length(venndata()) == 5){
-      color.choices = color.choices
-    }
+    color.choices <- color.choices[1:length(vendata())]
     grid.draw(venn.diagram(venndata(), filename = NULL, lwd = 1, col = color.choices, cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,
                            euler.d = TRUE))
   }, height = 400)
@@ -1738,21 +1670,7 @@ output$Unsupervised <- renderMenu({
       names(dummy) <- "Transcript.ID"
       if(identical(genelist2(),dummy)){return(NULL)}
       color.choices = c("blue", "green", "red", "orange","purple")
-      if(length(venndata()) == 1){
-        color.choices = color.choices[1]
-      }
-      if(length(venndata()) == 2){
-        color.choices = color.choices[1:2]
-      }
-      if(length(venndata()) == 3){
-        color.choices = color.choices[1:3]
-      }
-      if(length(venndata()) == 4){
-        color.choices = color.choices[1:4]
-      }
-      if(length(venndata()) == 5){
-        color.choices = color.choices
-      }
+      color.choices <- color.choices[1:length(vendata())]
       png(file)
       grid.draw(venn.diagram(venndata(), filename = NULL, lwd = 1, col = color.choices, cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,euler.d = TRUE))
       dev.off()
@@ -1780,20 +1698,6 @@ output$Unsupervised <- renderMenu({
     }
   )
 
-  mod_map_lmm_res <- reactive({
-    input$modmaplmmres
-  })
-
-  output$download_modmap_comparison <- downloadHandler(
-    filename = function() {paste('ModMap_Comparison','.png', sep = '')},
-    content = function(file){
-      png(file, width = (mod_map_lmm_res()/72)*700, height = (mod_map_lmm_res()/72)*190, res = mod_map_lmm_res())
-      print(ModMap_Comparison())
-      dev.off()
-    }
-  )
-
-
 ############## QUSAGE #####################
 
   output$qusage <- renderMenu({
@@ -1805,421 +1709,186 @@ output$Unsupervised <- renderMenu({
     }
   })
 
-  output$genesets <- renderUI({
+  qgenRes <- reactive({
     req(values$qusage.results)
-    if(is.list(values$qusage.results) & !is.data.frame(values$qusage.results)){
-      if(is.null(names(values$qusage.results))){
-        return(selectizeInput("genesets1", "Select geneset definition:", choices = c(1:length(values$qusage.results))))
-      }
-      if(!is.null(names(values$qusage.results))){
-        return(selectizeInput("genesets1", "Select geneset definition:", choices = c(names(values$qusage.results))))
-      }
-    }
-    else{
-      return(NULL)
-    }
-  })
-
-  master <- reactive({
-    req(values$qusage.results)
-    if(is.null(input$genesets1)){
-      qusage_results <- values$qusage.results
-    }
-    if(!is.null(input$genesets1)){
-      if(!is.null(names(values$qusage.results))){
-        qusage_results <- values$qusage.results[[input$genesets1]]
-      }
-      else{
-        qusage_results <- values$qusage.results[[as.numeric(input$genesets1)]]
-      }
-    }
-    master <- qusage_results
-    colnames(master)[which(colnames(master) == "log.fold.change")] <- "Log2FC"
-    unique_comp <- unique(master$Comparison)
-    sub_uniquecomp <- list()
-    n <- length(unique_comp)
-    for(i in 1:n){
-      sub_uniquecomp[[i]] <- which(master$Comparison == unique_comp[i])
-    }
+    qgenRes <- values$qusage.results
+    colnames(qgenRes)[which(colnames(qgenRes) == "log.fold.change")] <- "Log2FC"
     bonf <- list()
+    n <- length(unique(qgenRes$Comparison))
     for(i in 1:n){
-      bonf[[i]] <- p.adjust(master$p.Value[sub_uniquecomp[[i]]], method = "bonferroni")
+      bonf[[i]] <- p.adjust(qgenRes$p.Value[which(qgenRes$Comparison == unique(qgenRes$Comparison)[i])], method = "bonferroni")
     }
-    bonf <- unlist(bonf)
-    master$Bonf <- bonf
+    qgenRes$Bonf <- unlist(bonf)
     if(!is.null(values$annots)){
-     n2 <- length(values$annots[,1])
-     mod.ann <- list()
-     master$Modulev2_Annotation <- ""
-     for(i in 1:n2){
-      mod.ann[[i]] <- which(master$pathway.name %in% values$annots[,1][i])
-     }
-     for(i in 1:n2){
-      master$Modulev2_Annotation[mod.ann[[i]]] <- as.character(values$annots[,2][i])
+     n <- length(values$annots[,1])
+     qgenRes$Modulev2_Annotation <- ""
+     for(i in 1:n){
+      qgenRes$Modulev2_Annotation[which(qgenRes$pathway.name %in% values$annots[,1][i])] <- as.character(values$annots[,2][i])
      }
     }
-    master$Comparison <- as.factor(master$Comparison)
-    return(master)
+    qgenRes$Comparison <- as.factor(qgenRes$Comparison)
+    return(qgenRes)
   })
-
-  mod_list <- reactive({
-    Modulelist <- values$gene.sets
-    return(Modulelist)
-  })
-
-
-  output$Comparisons <- renderUI({
-    selectizeInput("set_comp", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
-  })
-
-  output$Comparisons1 <- renderUI({
-    selectizeInput("set_comp1", "Comparison(s) selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1], multiple = T)
-  })
-
-  output$Comparisons2 <- renderUI({
-    selectizeInput("set_comp2", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
-  })
-
-  output$Comparisons3 <- renderUI({
-    selectizeInput("set_comp3", "Comparison selection:", choices = unique(master()$Comparison), selected = unique(master()$Comparison)[1])
-  })
-
-  output$Module_Select1 <- renderUI({
-    selectizeInput("Mod_Select1", "Module selection:", choices = names(mod_list()), selected = names(mod_list()[1]))
+  
+  observe({
+    req(qgenRes())
+    updateSelectizeInput(session,"qgenComp", "Comparison(s) selection:", choices = unique(qgenRes()$Comparison), selected = unique(qgenRes()$Comparison)[1])
+    updateSelectizeInput(session,"qgenSingleComp", "Comparison selection:", choices = unique(qgenRes()$Comparison), selected = unique(qgenRes()$Comparison)[1])
+    updateSelectizeInput(session,"geneSetSelect", "Module selection:", choices = gtools::mixedsort(unique(as.character(qgenRes()$pathway.name))), 
+                         selected = gtools::mixedsort(unique(as.character(qgenRes()$pathway.name)))[1])
   })
 
   output$PaloOrFirst1  <- renderUI({
-    if(length(input$set_comp1) <= 1){return(NULL)}
+    if(length(input$qgenComp) <= 1){return(NULL)}
     else{
       selectizeInput("PaloOrFirst", "Significant gene sets:", choices = c("In at least one comparison chosen" = 1, "In first comparison chosen" = 2), selected = 1)
     }
   })
 
   output$ColorChoice <- renderUI({
-    if(length(input$set_comp1) <= 1){return(NULL)}
+    if(length(input$qgenComp) <= 1){return(NULL)}
     else{
       cols = c("blue", "red","green","lightskyblue","purple","hotpink","brown","gold")
-      selectizeInput("ColorChoice1", "Choose line colors:", choices = cols, selected = cols[1:length(input$set_comp1)], multiple = T)
+      selectizeInput("ColorChoice1", "Choose line colors:", choices = cols, selected = cols[1:length(input$qgenComp)], multiple = T)
     }
-  })
-
-  multi_testing <- reactive({
-    Multi_testing1 = input$Multi_testing1
-    Multi_testing1
-  })
-
-  multi_testing2 <- reactive({
-    Multi_testing2 = input$Multi_testing2
-    Multi_testing2
   })
   
-  comp_subset1 <- reactive({
-    input$set_comp1
+  qgenResFilt <- reactive({
+    input$qgenComp
     if(isTruthy(input$PaloOrFirst)){
-      master <- callModule(filterOpts, "qusFcPlot", data = master, comparison = reactive(input$set_comp1), data.type = "geneSets", 
-                           paloOrFirst = reactive(input$PaloOrFirst)) 
+      qgenRes <- callModule(filterOpts, "qusFcPlot", data = qgenRes, comparison = reactive(input$qgenComp), data.type = "geneSets", 
+                            paloOrFirst = reactive(input$PaloOrFirst)) 
     } else{
-      master <- callModule(filterOpts, "qusFcPlot", data = master, comparison = reactive(input$set_comp1), data.type = "geneSets",
-                           paloOrFirst = reactive(NULL))
+      qgenRes <- callModule(filterOpts, "qusFcPlot", data = qgenRes, comparison = reactive(input$qgenComp), data.type = "geneSets",
+                            paloOrFirst = reactive(NULL))
     }
-    return(master)
-  })
-
-
-output$Module_Select <- renderUI({
-    master <- master()[which(master()$Comparison %in% input$set_comp2),]
-    pathways <- master$pathway.name
-    selectizeInput("Mod_Select", "Module selection:", choices = gtools::mixedsort(as.character(pathways)), selected = gtools::mixedsort(as.character(pathways))[1])
+    return(qgenRes)
   })
 
   venn.data <- reactive({
-    req(master())
-    master <- comp_subset1()
-    unique.comparison <- unique(master$Comparison)
-    n = length(unique.comparison)
-    master1 <- list()
+    req(qgenResFilt())
+    dat <- qgenResFilt()
+    comparisons <- as.character(unique(dat$Comparison))
+    n <- length(comparisons)
+    dat_sub <- list()
     for(i in 1:n){
-      master1[[i]] <- subset(master, Comparison == unique.comparison[i])
+      dat_sub[[i]] <- dat %>% filter(Comparison == comparisons[i], SIG == "Significant") %>% pull(pathway.name) 
     }
-    names(master1) <- as.character(unique.comparison)
-    for(i in 1:n){
-      master1[[i]] <- master1[[i]]$pathway.name[which(master1[[i]]$SIG == "Significant")]
-    }
-    master1
+    names(dat_sub) <- comparisons
+    return(dat_sub)
   })
 
-  comp_overview <- reactive({
-    req(master())
-    master1 = master()[which(master()$p.Value <= input$SigLevel),]
-    master2 = master()[which(master()$FDR <= input$SigLevel),]
-    master3 = master()[which(master()$Bonf <= input$SigLevel),]
-    if(nrow(master1) == 0 & nrow(master2) == 0 & nrow(master3) == 0){return(NULL)}
-    if(input$foldchange.q == "+"){
-      master1 = master1[which(master1$Log2FC > 0),]
-      master2 = master2[which(master2$Log2FC > 0),]
-      master3 = master3[which(master3$Log2FC > 0),]
-    }
-    if(input$foldchange.q == "-"){
-      master1 = master1[which(master1$Log2FC < 0),]
-      master2 = master2[which(master2$Log2FC < 0),]
-      master3 = master3[which(master3$Log2FC < 0),]
-    }
-    if(nrow(master1) > 0){
-      master_sig1 = aggregate(Comparison ~ Comparison, data = master1, FUN = table, drop = FALSE)
-      master_sig1 = as.matrix(master_sig1)
-      master_sig1 = as.data.frame(master_sig1)
-      colnames(master_sig1) = sub("Comparison.", "",colnames(master_sig1))
-      master_sig1 = t(master_sig1)
-      master_sig1 = as.data.frame(master_sig1)
-      master_sig1 = cbind(rownames(master_sig1), master_sig1[,1])
-      master_sig1 = as.data.frame(master_sig1)
-    }
-    if(nrow(master2) > 0){
-      master_sig2 = aggregate(Comparison ~ Comparison, data = master2, FUN = table)
-      master_sig2 = as.matrix(master_sig2)
-      master_sig2 = as.data.frame(master_sig2)
-      colnames(master_sig2) = sub("Comparison.", "",colnames(master_sig2))
-      master_sig2 = t(master_sig2)
-      master_sig2 = as.data.frame(master_sig2)
-      master_sig2 = cbind(rownames(master_sig2), master_sig2[,1])
-      master_sig2 = as.data.frame(master_sig2)
-    }
-    if(nrow(master3) > 0){
-      master_sig3 = aggregate(Comparison ~ Comparison, data = master3, FUN = table)
-      master_sig3 = as.matrix(master_sig3)
-      master_sig3 = as.data.frame(master_sig3)
-      colnames(master_sig3) = sub("Comparison.", "",colnames(master_sig3))
-      master_sig3 = t(master_sig3)
-      master_sig3 = as.data.frame(master_sig3)
-      master_sig3 = cbind(rownames(master_sig3), master_sig3[,1])
-      master_sig3 = as.data.frame(master_sig3)
-    }
-    if(nrow(master1) > 0 & nrow(master2) > 0 & nrow(master3) > 0){
-      master_sig = cbind(master_sig1, master_sig2[,-1], master_sig3[,-1])
-      master_sig[,2] = as.numeric(as.character(master_sig[,2]))
-      master_sig[,3] = as.numeric(as.character(master_sig[,3]))
-      master_sig[,4] = as.numeric(as.character(master_sig[,4]))
-      colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
-      master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
-    }
-    if(nrow(master1) > 0 & nrow(master2) > 0 & nrow(master3) == 0){
-      master_sig = cbind(master_sig1, master_sig2[,-1], 0)
-      master_sig[,2] = as.numeric(as.character(master_sig[,2]))
-      master_sig[,3] = as.numeric(as.character(master_sig[,3]))
-      master_sig[,4] = as.numeric(as.character(master_sig[,4]))
-      colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
-      master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
-    }
-    if(nrow(master1) > 0 & nrow(master2) == 0 & nrow(master3) > 0){
-      master_sig = cbind(master_sig1, 0, master_sig3[,-1])
-      master_sig[,2] = as.numeric(as.character(master_sig[,2]))
-      master_sig[,3] = as.numeric(as.character(master_sig[,3]))
-      master_sig[,4] = as.numeric(as.character(master_sig[,4]))
-      colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
-      master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
-    }
-    if(nrow(master1) > 0 & nrow(master2) == 0 & nrow(master3) == 0){
-      master_sig = cbind(master_sig1, 0, 0)
-      master_sig[,2] = as.numeric(as.character(master_sig[,2]))
-      master_sig[,3] = as.numeric(as.character(master_sig[,3]))
-      master_sig[,4] = as.numeric(as.character(master_sig[,4]))
-      colnames(master_sig) = c("Comparison", "Raw", "FDR", "Bonf")
-      master_sig = master_sig[order(master_sig$Raw, decreasing = T),]
-    }
-    if(nrow(master_sig) == 1){
-     master_sig$Comparison <- unique(master()$Comparison)
-    }
-    return(master_sig)
+  compOverview <- reactive({
+    req(qgenRes())
+    resOverview <- qgenRes() %>% 
+      group_by(Comparison) %>%
+      summarise(Raw = case_when(input$foldchange.q == "+" ~ sum(p.Value <= input$sigLevel & Log2FC > 0),
+                                input$foldchange.q == "-" ~ sum(p.Value <= input$sigLevel & Log2FC < 0),
+                                TRUE ~ sum(p.Value <= input$sigLevel)),
+                FDR = case_when(input$foldchange.q == "+" ~ sum(FDR <= input$sigLevel & Log2FC > 0),
+                                input$foldchange.q == "-" ~ sum(FDR <= input$sigLevel & Log2FC < 0),
+                                TRUE ~ sum(FDR <= input$sigLevel)),
+                Bonf = case_when(input$foldchange.q == "+" ~ sum(Bonf <= input$sigLevel & Log2FC > 0),
+                                 input$foldchange.q == "-" ~ sum(Bonf <= input$sigLevel & Log2FC < 0),
+                                 TRUE ~ sum(Bonf <= input$sigLevel))) %>%
+      arrange(desc(Raw))
+    return(resOverview)
   })
 
-  individual_modselect <- reactive({
-    req(master())
-    input$set_comp2
-    master = master()[which(master()$Comparison == input$set_comp2 & master()$pathway.name == input$Mod_Select), ,drop = F]
-    lowerCI = values$lower.ci
-    upperCI = values$upper.ci
-    rownames(lowerCI) <- rownames(upperCI) <- as.character(values$results.file[,1])
-    mmr_modselection <- callModule(filterOpts, "qusIndFcPlot", data = reactive(values$results.file), comparison = reactive(input$set_comp2), data.type = "genes")
-    mmr_modselection <- mmr_modselection[which(mmr_modselection[,1] %in% mod_list()[[input$Mod_Select]]),]
-    lowerCI <- lowerCI[match(mmr_modselection[,1], rownames(lowerCI), nomatch = 0),which(colnames(lowerCI) %in% input$set_comp2)]
-    upperCI <- upperCI[match(mmr_modselection[,1], rownames(upperCI), nomatch = 0),which(colnames(upperCI) %in% input$set_comp2)]
-    mmr_names <- mmr_modselection[,2]
-    mmr_probes <- mmr_modselection[,1]
-    missing_symb <- which(sapply(mmr_names, function(x) identical("",x)))
-    if(length(missing_symb) > 0){
-      mmr_names[missing_symb] <- mmr_probes[missing_symb]
+  singleGeneSetDat <- reactive({
+    req(qgenRes())
+    input$qgenSingleComp
+    qgenRes <- qgenRes() %>% filter(Comparison == input$qgenSingleComp & pathway.name == input$geneSetSelect)
+    lowerCI <- values$lower.ci
+    upperCI <- values$upper.ci
+    rownames(lowerCI) <- rownames(upperCI) <- as.character(values$results.file$Transcript.ID)
+    geneLevelRes <- callModule(filterOpts, "qusIndFcPlot", data = reactive(values$results.file), comparison = reactive(input$qgenSingleComp), data.type = "genes")
+    geneLevelRes <- geneLevelRes %>% filter(Transcript.ID %in% values$gene.sets[[input$geneSetSelect]])
+    if(nrow(geneLevelRes) == 0){return(NULL)}
+    lowerCI <- lowerCI[match(geneLevelRes$Transcript.ID, rownames(lowerCI), nomatch = 0), input$qgenSingleComp]
+    upperCI <- upperCI[match(geneLevelRes$Transcript.ID, rownames(upperCI), nomatch = 0), input$qgenSingleComp]
+    gene.symbols <- as.character(geneLevelRes %>% pull(Gene.Symbol))
+    gene.ids <- as.character(geneLevelRes %>% pull(Transcript.ID))
+    missing_symb <- unlist(sapply(gene.symbols, function(x) identical("",x)))
+    if(sum(missing_symb) > 0){
+      gene.symbols[missing_symb == TRUE] <- gene.ids[missing_symb == TRUE]
     }
-    duplicates <- which(duplicated(mmr_names))
+    duplicates <- duplicated(gene.symbols)
     if(sum(duplicates) > 0){
-      mmr_names[duplicates] <- mmr_probes[duplicates]
+      gene.symbols[duplicates == TRUE] <- gene.ids[duplicates == TRUE]
     }
-    mmr_modselection <- cbind(mmr_modselection, lowerCI, upperCI)
-    mmr_modselection$Test.Statistic <- NULL
-    
-    if(nrow(mmr_modselection) == 0){return(NULL)}
-    Index <- order(mmr_modselection$Log2FC, decreasing = T)
-    mmr_modselection <- mmr_modselection[Index,]
-    mmr_modselection <- cbind(1:length(Index), mmr_modselection)
-    colnames(mmr_modselection) <- c("Index", colnames(mmr_modselection[,-1]))
-    mmr_modselection <- mmr_modselection
-    y = list(mmr_modselection = mmr_modselection, master = master)
-    return(y)
+    geneLevelRes$Gene.Symbol <- gene.symbols
+    geneLevelRes <- cbind(geneLevelRes, lowerCI, upperCI)
+    for(i in 1:ncol(geneLevelRes)){
+      if(is.numeric(geneLevelRes[,i])){
+        geneLevelRes[,i] <- as.numeric(formatC(geneLevelRes[,i], digits = 4))
+      }
+    }
+    geneLevelRes <- geneLevelRes[order(geneLevelRes$Log2FC, decreasing = T),]
+    geneLevelRes <- cbind(Index = c(1:nrow(geneLevelRes)), geneLevelRes)
+    return(list(geneLevelRes = geneLevelRes, qgenRes = qgenRes))
   })
-
-  plotHeight = function(){input$PlotHeight}
-  plotWidth = function(){input$PlotWidth}
-  plotHeight1 = function(){input$PlotHeight1}
-  plotWidth1 = function(){input$PlotWidth1}
-  plotHeight2 = function(){input$PlotHeight2}
-  plotWidth2 = function(){input$PlotWidth2}
-  plotres = function(){input$PlotRes}
-  plotres1 = function(){input$PlotRes1}
-  plotres2 = function(){input$PlotRes2}
-
-  ranges <- reactiveValues(x = NULL, y = NULL)
-  ranges2 <- reactiveValues(x = NULL, y = NULL)
-  comp_plot1 <- reactive({
-    req(master())
-    req(comp_subset1())
+  
+  geneSetLogFcPlot <- reactive({
+    req(qgenResFilt())
     if(input$only_annotated){
-      comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
+      qgenResFilt <- qgenResFilt() %>% filter(Modulev2_Annotation != "")
+    } else{
+      qgenResFilt <- qgenResFilt()
     }
-    else{
-      comp_subset1 <- comp_subset1()
+    qgenResFilt$ylow <- round(-max(c(abs(qgenResFilt$low), abs(qgenResFilt$up))),1)
+    qgenResFilt$yhigh <- round(max(c(abs(qgenResFilt$low), abs(qgenResFilt$up))),1)
+    if(input$showAnnotated){
+      qgenResFilt$pathway.name <- factor(paste(qgenResFilt$pathway.name,qgenResFilt$Modulev2_Annotation, sep = " "), 
+                                         levels = unique(paste(qgenResFilt$pathway.name,qgenResFilt$Modulev2_Annotation, sep = " ")))
     }
-
-    ylow = c()
-    yhigh = c()
-
-    if(min(comp_subset1$low) < 0 & max(comp_subset1$up) > 0){
-      if(abs(min(comp_subset1$low)) >= max(comp_subset1$up)){
-        ylow = min(comp_subset1$low)
-        yhigh = -min(comp_subset1$low)
-      }
-      else{
-        ylow = -max(comp_subset1$up)
-        yhigh = max(comp_subset1$up)
-      }
-    }
-
-    if(min(comp_subset1$low) > 0){
-      ylow = -max(comp_subset1$up)
-      yhigh = max(comp_subset1$up)
-    }
-
-    if(max(comp_subset1$up) < 0){
-      ylow = min(comp_subset1$low)
-      yhigh = -min(comp_subset1$low)
-    }
-
-    if(length(input$set_comp1) > 1){
-      if(min(comp_subset1$Log2FC) < 0 & max(comp_subset1$Log2FC) > 0){
-        if(abs(min(comp_subset1$Log2FC)) >= max(comp_subset1$Log2FC)){
-          ylow = min(comp_subset1$Log2FC)
-          yhigh = -min(comp_subset1$Log2FC)
-        }
-        else{
-          ylow = -max(comp_subset1$Log2FC)
-          yhigh = max(comp_subset1$Log2FC)
-        }
-      }
-      if(min(comp_subset1$Log2FC) > 0){
-        ylow = -max(comp_subset1$Log2FC)
-        yhigh = max(comp_subset1$Log2FC)
-      }
-      if(max(comp_subset1$Log2FC) < 0){
-        ylow = min(comp_subset1$Log2FC)
-        yhigh = -min(comp_subset1$Log2FC)
-      }
-    }
-
-    comp_subset1$ylow = round(ylow,1)
-    comp_subset1$yhigh = round(yhigh,1)
-
-    if(length(input$set_comp1) > 1){
-      n = length(input$set_comp1)
+    if(length(input$qgenComp) > 1){
+      n <- length(input$qgenComp)
       if(input$graphics6 == FALSE){
         line_colors = c("blue", "red","green","lightskyblue","purple","hotpink","brown","gold")
-      }
-      else{
+      } else{
         line_colors = input$ColorChoice1
       }
-      if(input$showAnnotated){
-        comp_subset1$pathway.name <- factor(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = " "), levels = unique(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = " ")))
-      }
-      #qusage_plot = ggplot(data = comp_subset1, aes(x = factor(Index), y = Log2FC, ymin = ylow, ymax = yhigh))
-      qusage_plot = ggplot(data = comp_subset1, aes(x = pathway.name, y = Log2FC, ymin = ylow, ymax = yhigh))
-      qusage_plot = qusage_plot + scale_x_discrete(labels = as.character(unique(comp_subset1$pathway.name)))
-      #qusage_plot = qusage_plot + scale_x_discrete(breaks = 1:length(comp_subset1$Index), labels = as.character.factor(comp_subset1$pathway.name[comp_subset1$Index]))
-      qusage_plot = qusage_plot + xlab("Modules") + ylab("Pathway Activity")
-      qusage_plot = qusage_plot + scale_colour_manual(values = line_colors) + geom_line(aes(colour = Comparison, group = Comparison), size = 1) + geom_hline(yintercept = 0, colour = "black", size = .5)
-      qusage_plot = qusage_plot + geom_point(aes(shape = SIG), size = 2) + scale_shape_manual(values = c(16,8))
+      qusage_plot <- ggplot(data = qgenResFilt, aes(x = pathway.name, y = Log2FC, ymin = ylow, ymax = yhigh)) + 
+        scale_x_discrete(labels = as.character(unique(qgenResFilt$pathway.name))) + xlab("Modules") + ylab("Pathway Activity") + 
+        scale_colour_manual(values = line_colors) + geom_line(aes(colour = Comparison, group = Comparison), size = 1) + 
+        geom_hline(yintercept = 0, colour = "black", size = .5) + geom_point(aes(shape = SIG), size = 2) + scale_shape_manual(values = c(16,8))
+    } else{
+      qusage_plot <- ggplot(data = qgenResFilt, aes(x = pathway.name, y = Log2FC, ymin = ylow, ymax = yhigh)) + 
+        ylab("Pathway Activity") + xlab("Modules") + geom_point() + geom_errorbar(aes(x = pathway.name, y = Log2FC, ymin = low, ymax = up)) + 
+        geom_hline(yintercept = 0, colour = "red", size = 1)
     }
-    else{
-      if(input$showAnnotated){
-        comp_subset1$pathway.name <- factor(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = "_"), levels = c(paste(comp_subset1$pathway.name,comp_subset1$Modulev2_Annotation, sep = "_")))
-      }
-      qusage_plot = qplot(x = pathway.name, y = Log2FC, data = comp_subset1, ymin = ylow, ymax = yhigh, ylab = "Pathway Activity", xlab = "Modules")
-      qusage_plot = qusage_plot + geom_point() + geom_errorbar(data = comp_subset1, aes(x = pathway.name, y = Log2FC, ymin = low, ymax = up))
-      qusage_plot = qusage_plot + geom_hline(yintercept = 0, colour = "red", size = 1)
-    }
-
-    qusage_plot = qusage_plot + theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) #+ coord_cartesian(xlim = ranges$x, ylim = ranges$y)
+    qusage_plot <- qusage_plot + theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
     return(qusage_plot)
-
   })
 
-
-  individual_modplot <- reactive({
-    req(master())
-    req(individual_modselect())
-    mmr_modselection <- individual_modselect()$mmr_modselection
-    master <- individual_modselect()$master
-    ylow = c()
-    yhigh = c()
-    if(min(mmr_modselection$lowerCI) < 0 & max(mmr_modselection$upperCI) > 0){
-      if(abs(min(mmr_modselection$lowerCI)) >= max(mmr_modselection$upperCI)){
-        ylow = min(mmr_modselection$lowerCI)
-        yhigh = -min(mmr_modselection$lowerCI)
-      }
-      else{
-        ylow = -max(mmr_modselection$upperCI)
-        yhigh = max(mmr_modselection$upperCI)
-      }
-    }
-    if(min(mmr_modselection$lowerCI) > 0){
-      ylow = -max(mmr_modselection$upperCI)
-      yhigh = max(mmr_modselection$upperCI)
-    }
-    if(max(mmr_modselection$upperCI) < 0){
-      ylow = min(mmr_modselection$lowerCI)
-      yhigh = -min(mmr_modselection$lowerCI)
-    }
-    mmr_modselection$ylow = round(ylow, 1)
-    mmr_modselection$yhigh = round(yhigh, 1)
-    mmr_modselection$Pathway.Activity = master$Log2FC
-    mod_plot = ggplot(data = mmr_modselection, aes(x = Index, y = Log2FC, ymin = ylow, ymax = yhigh)) + xlim(0, length(mmr_modselection$Index))
-    mod_plot = mod_plot + annotate("rect", xmin = -Inf, xmax = Inf, ymin = master$low, ymax = master$up, alpha = .3, fill = "lightblue")
-    mod_plot = mod_plot + scale_x_discrete(limits = as.character(mmr_modselection$Gene.Symbol[mmr_modselection$Index]))
-    mod_plot = mod_plot + geom_point()
-    mod_plot = mod_plot + geom_errorbar(data = mmr_modselection, aes(x = Index, y = Log2FC, ymin = lowerCI, ymax = upperCI))
-    mod_plot = mod_plot + xlab("Gene.Symbol ID") + ylab("Probe Level Log2 FC") + theme_bw() +
-               theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept = 0, colour = "red", size = 1)
-    mod_plot = mod_plot + geom_hline(aes(yintercept = Pathway.Activity), linetype = "dashed",colour = "black") + theme(plot.margin = unit(c(1,10,0,0), "lines"))
-    mod_plot = mod_plot + annotation_custom(textGrob(label = "Pathway Activity", hjust = 0), xmin = length(mmr_modselection$Index) + 1.08,
-                                            xmax = length(mmr_modselection$Index) + 1.08, ymin = master$Log2FC, ymax = master$Log2FC)
-    gt <- ggplot_gtable(ggplot_build(mod_plot))
+  singleGeneSetPlot <- reactive({
+    req(singleGeneSetDat())
+    geneLevelRes <- singleGeneSetDat()$geneLevelRes
+    qgenRes <- singleGeneSetDat()$qgenRes
+    geneLevelRes$ylow = round(-max(c(abs(min(geneLevelRes$lowerCI)), abs(max(geneLevelRes$upperCI)))), 1)
+    geneLevelRes$yhigh = round(max(c(abs(min(geneLevelRes$lowerCI)), abs(max(geneLevelRes$upperCI)))), 1)
+    geneLevelRes$Pathway.Activity = qgenRes$Log2FC
+    
+    geneSetPlot <- ggplot(data = geneLevelRes, aes(x = Index, y = Log2FC, ymin = ylow, ymax = yhigh)) + xlim(0, length(geneLevelRes$Index)) + 
+      annotate("rect", xmin = -Inf, xmax = Inf, ymin = qgenRes$low, ymax = qgenRes$up, alpha = .3, fill = "lightblue") + 
+      scale_x_discrete(limits = as.character(geneLevelRes$Gene.Symbol[geneLevelRes$Index])) + geom_point() + 
+      geom_errorbar(aes(x = Index, y = Log2FC, ymin = lowerCI, ymax = upperCI)) + xlab("Gene.Symbol ID") + ylab("Probe Level Log2 FC") + 
+      theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept = 0, colour = "red", size = 1) + 
+      geom_hline(aes(yintercept = Pathway.Activity), linetype = "dashed",colour = "black") + theme(plot.margin = unit(c(1,10,0,0), "lines")) + 
+      annotation_custom(textGrob(label = "Pathway Activity", hjust = 0), xmin = length(geneLevelRes$Index) + 1.08, 
+                        xmax = length(geneLevelRes$Index) + 1.08, ymin = qgenRes$Log2FC, ymax = qgenRes$Log2FC)
+    gt <- ggplot_gtable(ggplot_build(geneSetPlot))
     gt$layout$clip[gt$layout$name == "panel"] <- "off"
     gt
   })
 
-  output$GeneSetTab <- renderDT({
-    req(master())
-    req(individual_modselect())
-    y <- individual_modselect()$mmr_modselection
-    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
-    y <- y[,-1]
-    datatable(y,
+  output$geneSetTable <- renderDT({
+    req(singleGeneSetDat())
+    dat <- singleGeneSetDat()$geneLevelRes
+    dat$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",dat$Gene.Symbol," target = '_blank'",'>',dat$Gene.Symbol,"</a>",sep='')
+    dat <- dat[,-1]
+    datatable(dat,
               class = "table-condensed",
               style = "bootstrap4",
               rownames = FALSE,
@@ -2228,15 +1897,14 @@ output$Module_Select <- renderUI({
     )
   })
 
-  output$GeneSetPlot <- renderPlot({
-    req(master())
-    req(individual_modplot())
-    grid.draw(individual_modplot())
-  },width = plotWidth2, height = 400)
+  output$geneSetPlot <- renderPlot({
+    req(singleGeneSetPlot())
+    grid.draw(singleGeneSetPlot())
+  },width = function(){input$PlotWidth2}, height = 400)
 
-  output$CompOverview <- renderDT({
-    req(master())
-    datatable(comp_overview(),
+  output$compOverview <- renderDT({
+    req(qgenRes())
+    datatable(compOverview(),
               class = "table-condensed",
               style = "bootstrap4",
               rownames = FALSE,
@@ -2244,14 +1912,14 @@ output$Module_Select <- renderUI({
     )
   })
 
-  output$foldchange1 <- renderPlot({
-    req(master())
-    comp_plot1()
-  }, width = plotWidth1, height = 400)
+  output$logFcPlot <- renderPlot({
+    req(qgenRes())
+    geneSetLogFcPlot()
+  }, width = function(){input$PlotWidth1}, height = 400)
 
   output$venn <- renderUI({
-    req(master())
-    req(comp_subset1())
+    req(qgenRes())
+    req(qgenResFilt())
     if(length(venn.data()) == 1){return(NULL)}
     else{
       plotOutput("venndiagram")
@@ -2259,64 +1927,44 @@ output$Module_Select <- renderUI({
   })
 
   output$venn.download <- renderUI({
-    req(master())
-    req(comp_subset1())
+    req(venn.data())
     if(length(venn.data()) == 1){return(NULL)}
     else{
       downloadButton("downloadVenn2", "Download Figure")
     }
   })
 
-  venn.d <- reactive({
-    req(master())
-    color.choices = c("blue", "red","green","lightskyblue","purple","hotpink","brown","gold")
-    if(length(venn.data()) == 2){
-      color.choices = color.choices[1:2]
+  vennPlot <- reactive({
+    req(venn.data())
+    color.choices <- c("blue", "red","green","lightskyblue","purple","hotpink","brown","gold")
+    color.choices <- color.choices[1:length(venn.data())]
+    if(input$graphics6){
+      color.choices <- input$ColorChoice1
     }
-    if(length(venn.data()) == 3){
-      color.choices = color.choices[1:3]
-    }
-    if(length(venn.data()) == 4){
-      color.choices = color.choices[1:4]
-    }
-    if(length(venn.data()) == 5){
-      color.choices = color.choices[1:5]
-    }
-    if(input$graphics6 == FALSE){
-      return(venn.diagram(venn.data(), filename = NULL, lwd = 1, col = color.choices, cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,
-                          euler.d = TRUE))
-    }
-    else{
-      return(venn.diagram(venn.data(), filename = NULL, lwd = 1, col = input$ColorChoice1, cat.cex = .9, fil = input$ColorChoice1, margin = .12, ext.text = FALSE,
-                          euler.d = TRUE))
-    }
+    return(venn.diagram(venn.data(), filename = NULL, lwd = 1, col = color.choices, 
+                        cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,euler.d = TRUE))
   })
 
   output$venndiagram <- renderPlot({
-    req(comp_subset1())
-    grid.draw(venn.d())
+    req(qgenResFilt())
+    grid.draw(vennPlot())
   }, height = 400)
 
-  output$MultipleCompTab <- renderDT({
-    req(master())
+  output$multipleCompTab <- renderDT({
+    req(qgenResFilt())
+    qgenResFilt <- qgenResFilt() %>% dplyr::rename(P.Value = p.Value)
     if(!is.null(values$annots)){
       if(input$only_annotated){
-        comp_subset1 <- comp_subset1()[which(comp_subset1()$Modulev2_Annotation != ""),]
-      } else{
-        comp_subset1 <- comp_subset1()
+        qgenResFilt <- qgenResFilt %>% filter(Modulev2_Annotation != "")
+      } 
+    }
+    qgenResFilt <- qgenResFilt[,-c(1,11)]
+    for(i in 1:ncol(qgenResFilt)){
+      if(is.numeric(qgenResFilt[,i])){
+        qgenResFilt[,i] <- as.numeric(formatC(qgenResFilt[,i], digits = 4))
       }
     }
-    else{
-      comp_subset1 <- comp_subset1()
-    }
-    comp_subset1 <- comp_subset1[,-c(1,11)]
-    colnames(comp_subset1)[which(colnames(comp_subset1) == "p.Value")] <- "P.Value"
-    for(i in 1:ncol(comp_subset1)){
-      if(is.numeric(comp_subset1[,i])){
-        comp_subset1[,i] <- as.numeric(formatC(comp_subset1[,i], digits = 4))
-      }
-    }
-    datatable(comp_subset1[,c(1,9,2,3,4,8,5,6,7)],
+    datatable(qgenResFilt[,c(1,9,2,3,4,8,5,6,7)],
               class = "table-condensed",
               style = "bootstrap4",
               rownames = FALSE,
@@ -2325,10 +1973,9 @@ output$Module_Select <- renderUI({
   })
 
   output$downloadSigComps <- downloadHandler(
-
     filename = function() {paste(values$project.name,'_','Qusage_Sig_Comps_Table','.csv', sep='')  },
     content = function(file) {
-      write.csv(comp_overview(), file,row.names = FALSE)
+      write.csv(compOverview(), file,row.names = FALSE)
     }
   )
 
@@ -2336,7 +1983,7 @@ output$Module_Select <- renderUI({
     filename = function() {paste(values$project.name,'_','Multi_Comparisons_Plot','.png', sep = '')},
     content = function(file){
       png(file, width = (plotres1()/72)*plotWidth1(), height = (plotres1()/72)*480, res = plotres1())
-      print(comp_plot1())
+      print(geneSetLogFcPlot())
       dev.off()
     }
   )
@@ -2345,7 +1992,7 @@ output$Module_Select <- renderUI({
     filename = function() {paste(values$project.name,'_','Multi_Comparisons_Venn', '.png', sep = '')},
     content = function(file){
       png(file)
-      grid.draw(venn.d())
+      grid.draw(vennPlot())
       dev.off()
     }
   )
@@ -2353,9 +2000,9 @@ output$Module_Select <- renderUI({
   output$downloadTable2 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Qusage_Data_Table_Multi_Comp','.csv', sep='')  },
     content = function(file) {
-      comp_subset1 <- comp_subset1()[,-c(1,11)]
-      comp_subset1 <- comp_subset1[,c(1,9,2,3,4,8,5,6,7)]
-      write.csv(comp_subset1, file,row.names = FALSE)
+      qgenResFilt <- qgenResFilt()[,-c(1,11)]
+      qgenResFilt <- qgenResFilt[,c(1,9,2,3,4,8,5,6,7)]
+      write.csv(qgenResFilt, file,row.names = FALSE)
     }
   )
 
@@ -2363,7 +2010,7 @@ output$Module_Select <- renderUI({
     filename = function() {paste(values$project.name,'_', 'Individual_GeneSet_Plot','.png', sep = '')},
     content = function(file){
       png(file, width = (plotres2()/72)*plotWidth2(), height = (plotres2()/72)*480, res = plotres2())
-      grid.draw(individual_modplot())
+      grid.draw(singleGeneSetPlot())
       dev.off()
     }
   )
@@ -2371,7 +2018,7 @@ output$Module_Select <- renderUI({
   output$downloadTable3 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Qusage_Individual_GeneSet_Data_Table','.csv', sep='')  },
     content = function(file) {
-      write.csv(individual_modselect()$mmr_modselection[,-1], file,row.names = FALSE)
+      write.csv(singleGeneSetDat()$geneLevelRes[,-1], file,row.names = FALSE)
     }
   )
 
@@ -2386,26 +2033,27 @@ output$Module_Select <- renderUI({
     }
   })
 
-  output$setStat <- renderUI({
-    selectizeInput("setStat1", "Select gene set statistic:", choices = names(values$roast.results), selected = names(values$roast.results)[1])
+  observe({
+    req(values$roast.results)
+    updateSelectizeInput(session,"setStat", "Select gene set statistic:", choices = names(values$roast.results), selected = names(values$roast.results)[1])
   })
 
   roast.overview <- reactive({
-    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat1)]]
+    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat)]]
     Comparison <- names(results)
     Raw <- FDR <- Bonf <- c()
     for(i in 1:length(results)){
       Bonferroni <- p.adjust(results[[i]]$PValue, method = "bonferroni")
-      Raw[i] <- length(which(results[[i]]$PValue <= input$SigLevelR))
-      FDR[i] <- length(which(results[[i]]$FDR <= input$SigLevelR))
-      Bonf[i] <- length(which(Bonferroni <= input$SigLevelR))
+      Raw[i] <- length(which(results[[i]]$PValue <= input$sigLevelR))
+      FDR[i] <- length(which(results[[i]]$FDR <= input$sigLevelR))
+      Bonf[i] <- length(which(Bonferroni <= input$sigLevelR))
     }
     overview <- data.frame(Comparison = Comparison, Raw = Raw, FDR = FDR, Bonf = Bonf)
     overview
   })
 
   roast.results <- reactive({
-    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat1)]]
+    results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat)]]
     for(i in 2:length(results)){
       results[[i]] <- results[[i]][match(rownames(results[[1]]), rownames(results[[i]]), nomatch = 0),]
     }
@@ -2415,7 +2063,7 @@ output$Module_Select <- renderUI({
     results
   })
 
-  output$CompOverviewR <- renderDT({
+  output$compOverviewR <- renderDT({
     datatable(roast.overview(),
               class = "table-condensed",
               style = "bootstrap4",
@@ -2784,14 +2432,6 @@ output$Module_Select <- renderUI({
     }
   })
   
-  height1 <- function(){
-    input$PlotHeight4
-  }
-  
-  width1 <- function(){
-    input$PlotWidth4
-  }
-  
   rows.plot <- reactive({
     if(nrow(heatmap.data()$dat) > 300){return(NA)}
     else{return(NULL)}
@@ -2824,7 +2464,7 @@ output$Module_Select <- renderUI({
       return(aheatmap(heatmap.data()$dat,Colv = col_clust.corr(),labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), border_color = "grey60", 
                       Rowv = row_clust.corr(), breaks = c(-1,0,1)))
     }
-  }, height = height1, width = width1)
+  }, height = function(){input$PlotHeight4}, width = function(){input$PlotWidth4})
   
   output$download_corr_heatmap <- downloadHandler(
     filename = function() {paste(values$project.name,"_","Heatmap.png",sep = "")},
@@ -3085,18 +2725,9 @@ output$Module_Select <- renderUI({
     }
   )
   
-  height <- function(){
-    input$PlotHeight3
-  }
-  
-  width <- function(){
-    input$PlotWidth3
-  }
-  
   plotresolution.corr1 <- reactive({
     input$PlotRes3
   })
-  
   
   correlations_makePlot <- reactive({
     y <- correlation.data()$y
@@ -3186,7 +2817,7 @@ output$Module_Select <- renderUI({
   
   output$correlations_plot <- renderPlot({
     correlations_makePlot()
-  }, height = height, width = width)
+  }, height = function(){input$PlotHeight3}, width = function(){input$PlotWidth3})
   
   output$download_corr_plot <- downloadHandler(
     filename = function() {paste(values$project.name, "_","significant_correlations_plot.png")},
@@ -3214,14 +2845,6 @@ output$Module_Select <- renderUI({
     z <- list(x = x, y = y)
     return(z)
   })
-  
-  scatter_width <- function(){
-    input$PlotWidth5
-  }
-  
-  scatter_height <- function(){
-    input$PlotHeight5
-  }
   
   plot_res5 <- reactive({
     input$PlotRes5
@@ -3271,7 +2894,7 @@ output$Module_Select <- renderUI({
   
   output$correlations_scatter_plot <- renderPlot({
     scatter_makePlot()$scatplot
-  }, width = scatter_width, height = scatter_height)
+  }, width = function(){input$PlotWidth5}, height = function(){input$PlotHeight5})
   
   
   output$download_scatter_data <- downloadHandler(

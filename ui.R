@@ -34,7 +34,8 @@ body <-  dashboardBody(
                   hr(),
                   fileInput('file1', 'Upload BART Files and any QC reports for the Project:', multiple = TRUE,
                             accept=c(".rda",".png",".html",".csv")),
-                  uiOutput('exampleData'),
+                  selectizeInput("exampleData", "Select example BART results file for Demo:", choices = NULL, selected = NULL, multiple = TRUE,
+                                 options = list(maxItems = 1)),
                   uiOutput('uploadExampleData'),
                   br(),
                   tags$script('
@@ -60,13 +61,10 @@ body <-  dashboardBody(
     tabItem(tabName = "design",
             fluidRow(
               box(title = "Sample Annotation File", width = 12, status = "primary", solidHeader = FALSE,
-                  tags$head(
-                    tags$style(type="text/css", "tfoot {display: table-header-group}") # Move filters to top of datatable
-                  ),
                   downloadButton('downloadDesign', "Download Table"),
                   br(),
                   br(),
-                  DTOutput('designDataTable')
+                  DTOutput('designTable')
               )
             )
     ),
@@ -74,8 +72,9 @@ body <-  dashboardBody(
     tabItem(tabName = "summary",
             fluidRow(
               box(title = "Summarization Options", width = 3, status = "primary", solidHeader = FALSE,
-                  uiOutput('mainSummaryVar'),
-                  uiOutput('groupingVars'), 
+                  selectizeInput("summaryVar", "Main Variable for Summarization:", choices = NULL, multiple = TRUE, selected = NULL,
+                                 options = list(maxItems = 1)),
+                  selectizeInput("groupingVars", "Grouping variable(s)", choices = NULL, multiple = TRUE, selected = NULL),
                   selectizeInput("digits", 
                               label = "Number of decimal places:",
                               choices = c(0,1,2,3,4),
@@ -167,7 +166,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Association Tests", width = 9, status = "primary", solidHeader = FALSE,
                                     div(style = "overflow-x: auto",
-                                        tableOutput('cluster_output4'),
+                                        tableOutput('clusterTableFull'),
                                         helpText("The Chi-square test below is used to test for association between the cluster groups and user specified variable. 
                                                  The Chi-square test is ideal when expected cell counts are large (expected values greater than 5). 
                                                  Because the test only makes sense for 2x2 contingency tables and above, test statistics are not shown 
@@ -194,7 +193,7 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Heatmap Options", width = 3, status = "primary", solidHeader = FALSE,
                                     div(style = "display:inline-block", actionButton("goMod", "Plot")),
-                                    uiOutput("baylorModules"),
+                                    checkboxInput("baylorModules", strong("Are plotted scores from Baylor modules?"), FALSE),
                                     uiOutput("baseOrCtrl"),
                                     uiOutput("modSelection"),
                                     uploadVarsUI("mod", varType = "modules"),
@@ -250,7 +249,7 @@ body <-  dashboardBody(
                                 ),
                                 box(title = "Association Tests", width = 9, status = "primary", solidHeader = FALSE,
                                     div(style = "overflow-x: auto",
-                                        tableOutput('cluster_output3Other'),
+                                        tableOutput('modClusterTableFull'),
                                         helpText("The Chi-square test below is used to test for association between the cluster groups and user specified variable. 
                                                  The Chi-square test is ideal when expected cell counts are large (expected values greater than 5). 
                                                  Because the test only makes sense for 2x2 contingency tables and above, test statistics are not shown 
@@ -294,21 +293,20 @@ body <-  dashboardBody(
                      tabPanel(title = "Gene Lists",
                               fluidRow(
                                 box(title = "Filtering Options", width = 3, status = "primary", solidHeader = FALSE,
-                                    #uiOutput("Comparison1"),
                                     selectizeInput("comparison", "Comparison:", choices = NULL, selected = NULL, multiple = FALSE),
                                     filterOptsUI("dgeResultsTable"),
                                     uiOutput("mergeGeneSets"),
-                                    uiOutput("modmaplmmres"),
+                                    uiOutput("dgeModuleMapResolution"),
                                     checkboxInput("DownloadOptions", strong("Download multiple genelists at once:", style = "color:#456dae"), FALSE),
                                     conditionalPanel(condition = "input.DownloadOptions",
-                                                     uiOutput("selectComps"),
+                                                     selectizeInput("comparisonsDownload", "Comparison:", choices = NULL, selected = NULL, multiple = TRUE),
                                                      textInput("ziptext", label = "Filename Input", value = "All_Comparisons_Raw.05"),
                                                      downloadButton('downloadSelComp', 'Download selected genelists')
                                     )
                                 ),
                                 box(title = "Results Table", width = 9, status = "primary", solidHeader = FALSE,
                                     uiOutput("baylorMods"),
-                                    uiOutput('downloadModMap'),
+                                    uiOutput('downloadDgeModMap'),
                                     uiOutput('moduleMap'),
                                     helpText("Right click on hyperlinks to open in new window"),
                                     downloadButton('downloadData', 'Download Table'),
@@ -322,7 +320,7 @@ body <-  dashboardBody(
                               fluidRow(
                                 column(width = 4,
                                        box(title = "Comparison Selection", width = NULL, status = "primary",
-                                           uiOutput("diagnosticsComparison")
+                                           selectizeInput("diagnosticsComparison", "Comparison:", choices = NULL, selected = NULL, multiple = FALSE)
                                        ),
                                        box(title = "Overview Table", width = NULL, status = "primary",
                                            DTOutput("pvalThreshTable")
@@ -342,7 +340,7 @@ body <-  dashboardBody(
                                     div(style = "display:inline-block", infoPopup("Plot", 'The heatmap will not update until the "Plot" button is clicked.
                                                     This allows the user to make multiple adjustments at once, without having to wait for 
                                                     each individual adjustment to update on the heatmap.', placement = "right", trigger = "hover")),
-                                    uiOutput("Comparison3"),
+                                    selectizeInput("comparisonDgeHeatmap", "Comparison:", choices = NULL, selected = NULL, multiple = FALSE),
                                     filterOptsUI("dgeHeatmap"),
                                     uiOutput('test1'),
                                     div(style = "display:inline-block", checkboxInput("rowCluster", strong("Row Cluster"), value = FALSE)),
@@ -383,10 +381,10 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Options", width = 3, status = "primary", solidHeader = FALSE,
                                     filterOptsUI("dgeVenn"),
-                                    uiOutput("vennComparison"),
+                                    selectizeInput("Vcomparison", "Comparison:", choices = NULL, selected = NULL, multiple = TRUE),
                                     selectizeInput("UorI", "Intersection or union:", c("Intersection" = 1, "Union" = 2), selected = 1),
-                                    uiOutput("include"),
-                                    uiOutput("exclude")
+                                    selectizeInput("Include", "Include:", choices = NULL, selected = NULL, multiple = TRUE),
+                                    selectizeInput("Exclude", "Exclude:", choices = NULL, selected = NULL, multiple = TRUE)
                                 ),
                                 column(width = 9,
                                        box(title = "Venn Diagram", width = NULL, status = "primary", solidHeader = FALSE,
@@ -411,7 +409,8 @@ body <-  dashboardBody(
                                     div(style = "display:inline-block", helpPopup("Comparison(s) selection", "This option allows the user to select specific comparisons of interest",
                                                                                   trigger = "hover")),
                                     conditionalPanel(condition = "input.compSelect == true",
-                                                     uiOutput("Comparison2")),
+                                                     selectizeInput("comparisonModuleMat", "Comparison:", choices = NULL, selected = NULL, multiple = TRUE)),
+                                                     #uiOutput("comparisonModuleMat")),
                                     uiOutput("dgeModSelection"),
                                     br(),
                                     div(style = "display:inline-block", checkboxInput("uploadModules", strong("Upload modules", style = "color:#456dae"), FALSE)),
@@ -448,21 +447,21 @@ body <-  dashboardBody(
                      tabPanel("Overview",
                               fluidRow(
                                 box(title = "Filtering Options", width = 3, status = "primary", solidHeader = FALSE,
-                                    numericInput("SigLevel", "Significance threshold:", min = 0, max = 1, step = .025, value = .05),
+                                    numericInput("sigLevel", "Significance threshold:", min = 0, max = 1, step = .025, value = .05),
                                     selectizeInput("foldchange.q", strong("Log2 FC sign:"), choices = c("All (include 0)", "+","-"), selected = "All (include 0)")
                                 ),
                                 box(title = "Results Overview", width = 9, status = "primary", solidHeader = FALSE,
                                     downloadButton("downloadSigComps", "Download Table"),
                                     br(),
                                     br(),
-                                    DTOutput('CompOverview')
+                                    DTOutput('compOverview')
                                 )
                               )
                      ),
                      tabPanel("Log2 FC Plot and Venn Diagram",
                               fluidRow(
                                 box(title = "Filtering/Plotting Options", width = 3, status = "primary", solidHeader = FALSE,
-                                    div(style = "display:inline-block", uiOutput("Comparisons1")),
+                                    div(style = "display:inline-block", selectizeInput("qgenComp", "Comparison(s) selection:", choices = NULL, selected = NULL, multiple = TRUE)),
                                     div(style = "display:inline-block", infoPopup("Comparisons", "The user may select up to five comparisons.", placement = "right",
                                     trigger = "hover")),
                                     uiOutput("PaloOrFirst1"),
@@ -483,7 +482,7 @@ body <-  dashboardBody(
                                     box(title = "FC Plot", width = 12, status = "primary", solidHeader = FALSE,
                                         downloadButton("downloadPlot2", "Download Figure"),
                                         br(),
-                                        plotOutput("foldchange1")
+                                        plotOutput("logFcPlot")
                                     )
                                 )
                               ),
@@ -496,15 +495,15 @@ body <-  dashboardBody(
                                     downloadButton("downloadTable2", "Download Table"),
                                     br(),
                                     br(),
-                                    DTOutput('MultipleCompTab')
+                                    DTOutput('multipleCompTab')
                                 )
                               )
                      ),
                      tabPanel("Individual Gene Set Plot and Table",
                               fluidRow(
                                 box(title = "Filtering Options", width = 3, status = "primary", solidHeader = FALSE,
-                                    uiOutput("Module_Select"),
-                                    uiOutput("Comparisons2"),
+                                    selectizeInput("geneSetSelect", "Module selection:", choices = NULL, selected = NULL),
+                                    selectizeInput("qgenSingleComp", "Comparison selection:", choices = NULL, selected = NULL, multiple = FALSE),
                                     br(),
                                     filterOptsUI("qusIndFcPlot"),
                                     br(),
@@ -519,14 +518,14 @@ body <-  dashboardBody(
                                            box(title = "FC Plot", width = 12, status = "primary", solidHeader = FALSE,
                                                downloadButton("downloadPlot3", "Download Figure"),
                                                br(),
-                                               plotOutput('GeneSetPlot')
+                                               plotOutput('geneSetPlot')
                                            )
                                        ),
                                        box(title = "Results Table", width = NULL, status = "primary", solidHeader = FALSE,
                                            downloadButton("downloadTable3", "Download Table"),
                                            br(),
                                            br(),
-                                           DTOutput('GeneSetTab')
+                                           DTOutput('geneSetTable')
                                        )
                                 )
                               )
@@ -540,14 +539,14 @@ body <-  dashboardBody(
                        tabPanel("Overview",
                                 fluidRow(
                                   box(title = "Filtering Options", width = 3, status = "primary", solidHeader = FALSE,
-                                      uiOutput("setStat"),
-                                      numericInput('SigLevelR', "Significance threshold:", min = 0, max = 1, value = .05, step = .025)
+                                      selectizeInput("setStat", "Select gene set statistic:", choices = NULL, selected = NULL),
+                                      numericInput('sigLevelR', "Significance threshold:", min = 0, max = 1, value = .05, step = .025)
                                   ),
                                   box(title = "Results Overview", 
                                       downloadButton("downloadSigCompsR", "Download Table"),
                                       br(),
                                       br(),
-                                      DTOutput('CompOverviewR')
+                                      DTOutput('compOverviewR')
                                   )
                                 )
                        )

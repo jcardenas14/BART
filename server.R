@@ -11,14 +11,14 @@ shinyServer(function(input,output, session){
         names(try) <- paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized")
       }
     }
-
+    
     if(!is.null(values$rowdend3)){
       if(ctrl()$id == TRUE){
         try<-list(1,2,3,4,5)
         names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),
                         "All Samples Healthy Normalized","All Samples Baseline Normalized")
       }
-
+      
       if(ctrl()$id == FALSE){
         try<-list(1,3,5)
         names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"), paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
@@ -26,7 +26,7 @@ shinyServer(function(input,output, session){
     }
     selectizeInput("set", "Select heatmap:", choices = as.list(try), multiple = FALSE)
   })
-
+  
   list.projects <- reactive({
     setwd(old)
     list.files("data")
@@ -42,15 +42,15 @@ shinyServer(function(input,output, session){
       actionButton("uploadExampleData", "Upload Demo BART file", class = "btn-primary", style = "color: white; background-color: #363f47")
     )
   })
-
+  
   fileindex <- reactive({
     req(input$file1)
     index <- which(input$file1$name == "bartResults.rda")
     index
   })
-
+  
   values <- reactiveValues()
-
+  
   updateData <- function(path, route){
     vars <- load(file = path, envir = .GlobalEnv)
     setwd(route)
@@ -61,19 +61,19 @@ shinyServer(function(input,output, session){
   }
   
   baylorMod <- reactive({
-   if(is.null(values$dge.gsets)){
-    baylorMod <- NULL
-   } else{
-    baylorMod <- input$baylorMods
-   }
-   baylorMod
+    if(is.null(values$dge.gsets)){
+      baylorMod <- NULL
+    } else{
+      baylorMod <- input$baylorMods
+    }
+    baylorMod
   })
   
   unsupervisedBaylorMod <- reactive({
-   baylorMod <- input$baylorModules
-   baylorMod
+    baylorMod <- input$baylorModules
+    baylorMod
   })
-
+  
   observe({
     req(input$file1)
     mypath <- input$file1[[fileindex(), 'datapath']]
@@ -81,11 +81,11 @@ shinyServer(function(input,output, session){
   })
   
   observeEvent(input$uploadExampleData,{
-   withBusyIndicatorServer("uploadExampleData", {
-    setwd(old)
-    mypath <- "data/Longitudinal Macaque TB Data/bartResults.rda"
-    updateData(mypath, tempdir())
-   })
+    withBusyIndicatorServer("uploadExampleData", {
+      setwd(old)
+      mypath <- "data/Longitudinal Macaque TB Data/bartResults.rda"
+      updateData(mypath, tempdir())
+    })
   })
   
   design <- reactive({
@@ -153,11 +153,11 @@ shinyServer(function(input,output, session){
   
   time.var <- reactive({
     if(is.null(values$time.var)){
-     id <- flow <- metab <- NULL
+      id <- flow <- metab <- NULL
     } else{
-     id <- values$time.var[[which(names(values$time.var) %in% c("microarray", "rnaseq"))]]
-     flow <- values$time.var[[which(names(values$time.var) %in% c("flow"))]]
-     metab <- values$time.var[[which(names(values$time.var) %in% c("metab"))]]
+      id <- values$time.var[[which(names(values$time.var) %in% c("microarray", "rnaseq"))]]
+      flow <- values$time.var[[which(names(values$time.var) %in% c("flow"))]]
+      metab <- values$time.var[[which(names(values$time.var) %in% c("metab"))]]
     }
     z <- list(id = id, flow = flow, metab = metab)
     return(z)
@@ -178,26 +178,26 @@ shinyServer(function(input,output, session){
     z <- list(id = id, flow = flow, metab = metab)
     return(z)
   })
-
+  
   output$versionbox <- renderValueBox({
     valueBox(
       paste0("Software Version: 1.0.0 \nRelease Date: TBD"), version$version.string, icon = icon("th-list"),
       color = "purple"
     )
   })
-
+  
   output$version <- renderPrint({
     writeLines("Software Version: 1.0.0 \nRelease Date: TBD")
     writeLines(version$version.string)
   })
-
+  
   output$projectName <- renderText({
     values$project.name
   })
-
-
+  
+  
   ############ Design File and Summary Statistics ##############################
-
+  
   output$SumStat <- renderMenu({
     if(is.null(values$design)){
       return(strong(""))
@@ -267,8 +267,8 @@ shinyServer(function(input,output, session){
       }
     }
   })
-
-
+  
+  
   output$designTable <- renderDT({
     datatable(design()$des,
               class = "table-condensed",
@@ -277,9 +277,9 @@ shinyServer(function(input,output, session){
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   output$downloadDesign <- downloadHandler(
-
+    
     filename = function() {paste(values$project.name,'_Design','.csv', sep='')  },
     content = function(file) {
       write.csv(design()$des, file, row.names = FALSE)
@@ -315,15 +315,15 @@ shinyServer(function(input,output, session){
     }
     return(summaryTable)
   })
-
+  
   output$downloadSummary0 <- downloadHandler(
-
+    
     filename = function() {'SummaryStats_Table1.csv'},
     content = function(file) {
       write.csv(summaryTable(), file, row.names = FALSE)
     }
   )
-
+  
   output$summaryText <- renderUI({
     req(input$summaryVar)
     table_description <- paste0(strong("Table: "), "Summary Statistics for ", input$summaryVar)
@@ -346,20 +346,20 @@ shinyServer(function(input,output, session){
     }
     HTML(table_description)
   })
-
+  
   designForSummaryStats <- reactive({
     design <- design()$des
     time.var <- time.var()$id
     for(i in 1:ncol(design)){
-     if(is.null(time.var)){
-      if(is.factor(design[,i])){
-       design[,i] <- as.character(design[,i])
+      if(is.null(time.var)){
+        if(is.factor(design[,i])){
+          design[,i] <- as.character(design[,i])
+        }
+      } else{
+        if(is.factor(design[,i]) || colnames(design)[i] == time.var){
+          design[,i] <- as.character(design[,i])
+        }
       }
-     } else{
-      if(is.factor(design[,i]) || colnames(design)[i] == time.var){
-       design[,i] <- as.character(design[,i])
-      }
-     }
       if(length(which(design[,i] == "")) > 0){
         design[,i][which(design[,i] == "")] <- NA
       }
@@ -394,29 +394,29 @@ shinyServer(function(input,output, session){
   output$summaryTable2 <- renderTable({
     summaryTable()
   },digits = dig, include.rownames = FALSE)
-
+  
   ######################### Unsupervised Side Menu ###############################
-
-output$Unsupervised <- renderMenu({
-  if(is.null(values$exprs)){
+  
+  output$Unsupervised <- renderMenu({
+    if(is.null(values$exprs)){
       return(strong(""))
-  }
+    }
+    
+    if(is.null(values$scores.base) & is.null(values$scores.ctrl)){
+      return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
+                      menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"))
+      )
+    }
+    
+    if(!is.null(values$scores.base) || !is.null(values$scores.ctrl)){
+      return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
+                      menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
+                      menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
+      )
+    }
+  })
   
-  if(is.null(values$scores.base) & is.null(values$scores.ctrl)){
-    return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"))
-    )
-  }
   
-  if(!is.null(values$scores.base) || !is.null(values$scores.ctrl)){
-    return(menuItem("Unupervised Analysis", icon = icon("line-chart"), tabName = "unsupervised",
-                    menuSubItem("Gene Level Heat Maps", tabName = "probeheatmap"),
-                    menuItem("Module Maps", icon = icon("angle-double-right"), tabName = "moduleMap"))
-    )
-  }
-})
-
-
   #################################### Module Maps ############################
   
   output$baseOrCtrl <- renderUI({
@@ -532,8 +532,8 @@ output$Unsupervised <- renderMenu({
     withProgress(message = 'Making plot',
                  detail = 'This may take a while...', value = 1,{
                    aheatmap_circle(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circleSize = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
-                             color = color.heatmap(),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                             breaks=seq(-100,100,by=4))
+                                   color = color.heatmap(),annCol = modClusterData()$colAnnot,annColors = modColors(),
+                                   breaks=seq(-100,100,by=4))
                  }
     )
   }, width = function(){modGraphParams()$width}, height = function(){modGraphParams()$height})
@@ -546,8 +546,8 @@ output$Unsupervised <- renderMenu({
       width <- modGraphParams()$width
       png(file, width = (res/72)*width, height = (res/72)*height, res = res)
       print(aheatmap_circle(modOrderedData()$x,Rowv = modRowCluster()$ddm, Colv = modClusterData()$colddm, circleSize = modGraphParams()$circleSize, treeheight = modGraphParams()$treeHeight, fontsize = modGraphParams()$fontSize, cexRow = 1.2, 
-                      color = color.heatmap(),annCol = modClusterData()$colAnnot,annColors = modColors(),
-                      breaks=seq(-100,100,by=4)))
+                            color = color.heatmap(),annCol = modClusterData()$colAnnot,annColors = modColors(),
+                            breaks=seq(-100,100,by=4)))
       dev.off()
     }
   )
@@ -557,16 +557,16 @@ output$Unsupervised <- renderMenu({
     content = function(file) {
       x <- modOrderedData()$x
       if(!is.na(modRowCluster()$ddm)){
-       x <- x[order.dendrogram(modRowCluster()$ddm),]
+        x <- x[order.dendrogram(modRowCluster()$ddm),]
       }
       if(!is.na(modClusterData()$colddm)){
-       x <- x[,order.dendrogram(modClusterData()$colddm)]
+        x <- x[,order.dendrogram(modClusterData()$colddm)]
       }
       write.csv(x, file, row.names = TRUE)
     }
   )
-
-
+  
+  
   output$modOptimalNumber <- renderText({
     paste("Optimal number of clusters =", modClusterData()$opt_num )
   })
@@ -574,7 +574,7 @@ output$Unsupervised <- renderMenu({
   output$modDunnIndexPlot <- renderPlot({
     barplot(modClusterData()$d, names.arg = 2:round(nrow(modOrderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn's Index",cex.main = 1.5, col = "#4ba9d6")
   }, height = 400)
-
+  
   output$downloadClusterPlot2Other <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Cluster_Plot_Longitudinal','.png', sep = '')},
     content = function(file){
@@ -625,9 +625,9 @@ output$Unsupervised <- renderMenu({
       }
     }
   })
-
+  
   ##################################### Gene Level Heat Map #####################################
-
+  
   heatmapData <- reactive({
     if (input$set==1){#heatmapbase1
       if(ctrl()$id == TRUE){
@@ -638,10 +638,10 @@ output$Unsupervised <- renderMenu({
         base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id)]
         index <- which(colnames(values$exprs) %in% base_sample_name)
       }
-        exp_base_sam <- values$exprs[, index]
-        des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)),]
-        y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
-        ddm<-values$rowdend1b
+      exp_base_sam <- values$exprs[, index]
+      des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)),]
+      y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
+      ddm<-values$rowdend1b
     }
     if (input$set==2){#heatmapbase2
       base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id]==baseline.val()$id | design()$des[,control.var()$id]==control.val()$id)]
@@ -690,7 +690,7 @@ output$Unsupervised <- renderMenu({
     }
     checkboxInput("dgePlotGeneSymbols", "Plot Gene Symbols?", FALSE)
   })
-
+  
   heatNormType <- reactive({
     if(input$set==1) heattxt<-paste0("Baseline ",str_to_sentence(values$norm.method)," Normalized")
     if(input$set==2) heattxt<-"Baseline Healthy Normalized"
@@ -729,10 +729,10 @@ output$Unsupervised <- renderMenu({
     x <- callModule(clusterAssociation, "unsupervisedAssociation", des = reactive(orderedData()$design), hclObj = reactive(clusterData()$hcl))
     return(x)
   })
-
+  
   orderedData <- reactive({
     dat <- callModule(subsetAndOrder, "unsupervisedSubOrder", des = reactive(heatmapData()$y$design.norm), data = reactive(rowCluster()$x), 
-                    sampleAnnot = reactive(sample.id()$id))
+                      sampleAnnot = reactive(sample.id()$id))
     x <- dat$dat
     colAnnot <- dat$colAnnot
     design <- dat$design
@@ -743,9 +743,9 @@ output$Unsupervised <- renderMenu({
   maxRangeData <- eventReactive(input$go, {
     x <- callModule(maxValues, "unsupervisedMaxValues", reactive(orderedData()$x))
     if(!is.null(values$results.file) & all.equal(values$results.file$Transcript.ID, values$results.file$Gene.Symbol) != TRUE){
-     if(input$plotGeneSymbols){
-      rownames(x) <- make.unique(as.character(values$results.file$Gene.Symbol[match(rownames(x), as.character(values$results.file$Transcript.ID))]))
-     }
+      if(input$plotGeneSymbols){
+        rownames(x) <- make.unique(as.character(values$results.file$Gene.Symbol[match(rownames(x), as.character(values$results.file$Transcript.ID))]))
+      }
     }
     return(x)
   })
@@ -759,8 +759,8 @@ output$Unsupervised <- renderMenu({
     withProgress(message = 'Making plot',
                  detail = 'This may take a while...', value = 1,{
                    aheatmap(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
-                             color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows,
-                             annRow = rowCluster()$rowAnnot,breaks=0)
+                            color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows,
+                            annRow = rowCluster()$rowAnnot,breaks=0)
                  }
     )
   }, width = function(){graphParams()$width}, height = function(){graphParams()$height})
@@ -769,9 +769,9 @@ output$Unsupervised <- renderMenu({
     filename = function() {paste('Gene_Level_Heatmap','.png', sep = '')},
     content = function(file){
       png(file, width = (graphParams()$resolution/72)*graphParams()$width, height = (graphParams()$resolution/72)*graphParams()$height, res = graphParams()$resolution)
-        print(aheatmap(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
-                        color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows, 
-                        breaks=0))
+      print(aheatmap(maxRangeData(),Rowv = rowCluster()$ddm,Colv = clusterData()$colddm, treeheight = graphParams()$treeHeight, fontsize = graphParams()$fontSize, cexRow = 1.2, 
+                     color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = clusterData()$colAnnot,annColors = heatColors(),labRow=rowCluster()$labelRows, 
+                     breaks=0))
       dev.off()
     }
   )
@@ -801,12 +801,12 @@ output$Unsupervised <- renderMenu({
     }
     return(x)
   })
-
-
+  
+  
   output$dunnIndexPlot <- renderPlot({
     barplot(clusterData()$d, names.arg = 2:round(nrow(orderedData()$colAnnot)/2), xlab = "Number of Clusters", ylab = "Dunn Index",main = "Dunn Index for Cluster Number Selection", cex.main = 1.5, col = "#4ba9d6")
   }, height = 400)
-
+  
   output$downloadClusterPlot3 <- downloadHandler(
     filename = function() {paste('DunnIndexPlot','.png', sep = '')},
     content = function(file){
@@ -815,23 +815,23 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
-
+  
   output$OptimalNumber <- renderText({
     paste("Optimal number of clusters =", clusterData()$opt_num )
   })
-
+  
   output$clusterTableFull <- renderTable({
     req(gen_clustTab())
     gen_clustTab()$table1
   }, include.rownames = FALSE, digits = 0)
-
+  
   output$clusterTableDescription <- renderText({
     req(gen_clustTab())
     if(ncol(gen_clustTab()$table2) > 1){
       print("The table below is the table the tests are run on. It is the same as the table above, except the columns with zero counts have been deleted.")
     }
   })
-
+  
   output$clusterTable <- renderTable({
     req(gen_clustTab())
     if(ncol(gen_clustTab()$table2) > 1){
@@ -847,7 +847,7 @@ output$Unsupervised <- renderMenu({
           cat(paste0("Chi_square statistic = ", round(gen_clustTab()[[3]]$statistic, 2), ", ", "p-value < .001","\nFishers Exact Test: p-value < .001"))
         } else{
           cat(paste0("Chi_square statistic = ", round(gen_clustTab()[[3]]$statistic, 2), ", ", "p-value < .001",
-                       "\nFishers Exact Test: p-value = ", round(gen_clustTab()[[4]]$p.value, 3)))
+                     "\nFishers Exact Test: p-value = ", round(gen_clustTab()[[4]]$p.value, 3)))
         }
       } else{
         if(gen_clustTab()[[4]]$p.value < .001){
@@ -860,9 +860,9 @@ output$Unsupervised <- renderMenu({
       }
     }
   })
-
+  
   ################################# DGE ###########################################
-
+  
   output$dge <- renderMenu({
     if(is.null(values$results.file)){
       return(strong(""))
@@ -871,50 +871,35 @@ output$Unsupervised <- renderMenu({
       return(menuItem("DGE Analysis", icon = icon("area-chart"), tabName = "genelistmaker"))
     }
   })
-
+  
   dgeOverview <- reactive({
-    results.file <- values$results.file
-    estimates <- results.file[,grep("Estimate", names(results.file)), drop = FALSE]
-    pvals <- results.file[,grep("^P.Value", names(results.file)), drop = FALSE]
-    fdr.pvals <- results.file[,grep("FDR.P.Value", names(results.file)), drop = FALSE]
+    results <- values$results.file
+    estimates <- results[,grep("Estimate", names(results)), drop = FALSE]
+    pvals <- results[,grep("^P.Value", names(results)), drop = FALSE]
+    fdr.pvals <- results[,grep("FDR.P.Value", names(results)), drop = FALSE]
     bonf.pvals <- data.frame(apply(pvals, 2, p.adjust, method = "bonferroni"))
-    colnames(bonf.pvals) <- gsub("P.Value.","Bonf.P.Value.",colnames(bonf.pvals))
     comparisons <- gsub("Estimate.", "", colnames(estimates))
-    raw <- fdr <- bonf <- c()
-    if(input$overviewFc){
-      if(input$selectFcSign == "+"){
-        for(i in 1:ncol(estimates)){
-          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
-          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
-          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & estimates[,i] >= input$selectFcValue, na.rm = TRUE)
-        }
-      } else if(input$selectFcSign == "-"){
-        for(i in 1:ncol(estimates)){
-          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
-          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
-          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & estimates[,i] <= -input$selectFcValue, na.rm = TRUE)
-        }
-      } else{
-        for(i in 1:ncol(estimates)){
-          raw[i] <- sum(pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
-          fdr[i] <- sum(fdr.pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
-          bonf[i] <- sum(bonf.pvals[,i] <= input$alphalevel2 & (estimates[,i] >= input$selectFcValue | estimates[,i] <= -input$selectFcValue), na.rm = TRUE)
-        }
-      }
+    if(input$selectFcSign == "+"){
+      raw <- colSums(pvals <= input$alphalevel2 & estimates >= input$selectFcValue, na.rm = TRUE)
+      fdr <- colSums(fdr.pvals <= input$alphalevel2 & estimates >= input$selectFcValue, na.rm = TRUE)
+      bonf <- colSums(bonf.pvals <= input$alphalevel2 & estimates >= input$selectFcValue, na.rm = TRUE)
+    } else if(input$selectFcSign == "-"){
+      raw <- colSums(pvals <= input$alphalevel2 & estimates <= -input$selectFcValue, na.rm = TRUE)
+      fdr <- colSums(fdr.pvals <= input$alphalevel2 & estimates <= -input$selectFcValue, na.rm = TRUE)
+      bonf <- colSums(bonf.pvals <= input$alphalevel2 & estimates <= -input$selectFcValue, na.rm = TRUE)
     } else{
-      raw <- apply(pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
-      fdr <- apply(fdr.pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
-      bonf <- apply(bonf.pvals, 2, function(x) sum(x <= input$alphalevel2, na.rm = TRUE))
+      raw <- colSums(pvals <= input$alphalevel2 & (estimates >= input$selectFcValue | estimates <= -input$selectFcValue), na.rm = TRUE)
+      fdr <- colSums(fdr.pvals <= input$alphalevel2 & (estimates >= input$selectFcValue | estimates <= -input$selectFcValue), na.rm = TRUE)
+      bonf <- colSums(bonf.pvals <= input$alphalevel2 & (estimates >= input$selectFcValue | estimates <= -input$selectFcValue), na.rm = TRUE)
     }
-    overview <- data.frame(Comparison = comparisons, Raw = raw, FDR = fdr, Bonf = bonf)
-    y <- list(z = overview)
-    return(y)
+    overview <- data.frame(Comparison = comparisons, Raw = raw, FDR = fdr, Bonf = bonf) %>% arrange(desc(Raw))
+    return(overview)
   })
-
+  
   output$dgeOverviewTable <- renderDT({
     withProgress(message = 'Making the table',
                  detail = 'This may take a while...', value = 1,{
-                   datatable(dgeOverview()$z[order(dgeOverview()$z$Raw,decreasing=TRUE),],
+                   datatable(dgeOverview(),
                              class = "table-condensed",
                              style = "bootstrap4",
                              rownames = FALSE,
@@ -923,22 +908,10 @@ output$Unsupervised <- renderMenu({
                  })
   })
   
-  index <- reactive({
-    which(names(values$results.file) == paste0("P.Value.",input$diagnosticsComparison))
-  })
-  
-  pcomp <- reactive({
-    x <- sub("^", "P.Value.", input$comparison)
-    x
-  })
-
-  plottitle1 <- reactive({
-    paste("Distribution of Raw p-values for", input$diagnosticsComparison)
-  })
-
   output$pvalDistPlot<-renderPlot({
-    y<-max(hist(values$results.file[, index()])$density)
-    hist(values$results.file[,index()], freq=FALSE, xlim=c(0,1), ylim=c(0,y),main=plottitle1(),
+    y<-max(hist(values$results.file[,paste0("P.Value.",input$diagnosticsComparison)])$density)
+    hist(values$results.file[,paste0("P.Value.",input$diagnosticsComparison)], freq=FALSE, xlim=c(0,1), ylim=c(0,y),
+         main=paste("Distribution of Raw p-values for", input$diagnosticsComparison),
          xlab="Raw p-value's", ylab="Density")
     lines(c(0,1),c(1,1),lwd=2,lty=2)
   }, height = 400)
@@ -947,15 +920,15 @@ output$Unsupervised <- renderMenu({
     dat <- c()
     thresh <- c(0.001,0.01,1:19/20)
     for(i in thresh){
-      dat <- rbind(dat, c(mycorrection(values$results.file[,index()],i,"RAW"),
-                          mycorrection(values$results.file[,index()],i,"FDR"),
-                          mycorrection(values$results.file[,index()],i,"BONF")))
+      dat <- rbind(dat, c(mycorrection(values$results.file[,paste0("P.Value.",input$diagnosticsComparison)],i,"RAW"),
+                          mycorrection(values$results.file[,paste0("P.Value.",input$diagnosticsComparison)],i,"FDR"),
+                          mycorrection(values$results.file[,paste0("P.Value.",input$diagnosticsComparison)],i,"BONF")))
     }
     dat <- data.frame(cbind(thresh,dat))
     colnames(dat) <- c("Alpha","Raw","FDR","Bonf")
     return(dat)
   })
-
+  
   output$pvalThreshTable <-renderDT({
     dat <- cbind(pvalThreshData()[,1,drop=FALSE],pvalThreshData()[,2:4]*dim(values$results.file)[1])
     datatable(dat,
@@ -968,10 +941,7 @@ output$Unsupervised <- renderMenu({
   
   multGeneLists <- reactive({
     if(length(grep("All", input$comparisonsDownload)) > 0){
-      nam <- names(values$results.file)
-      index <- grep("^P.Value",nam)
-      p.names <- nam[index]
-      comps <- gsub("P.Value.", "", p.names)
+      comps <- dgeComparisons()
     }
     else{
       comps <- input$comparisonsDownload
@@ -984,7 +954,7 @@ output$Unsupervised <- renderMenu({
     names(x.all) <- comps
     return(x.all)
   })
-
+  
   dgeModuleDat <- reactive({
     if(!is.null(values$dge.gsets)){
       genes <- unlist(values$dge.gsets)
@@ -1115,25 +1085,25 @@ output$Unsupervised <- renderMenu({
     }
     return(x)
   })
-
+  
   output$dgeResultTable <- renderDT({
     input$comparison
-    y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison), "genes")
+    dat <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison), "genes")
     if(!is.null(values$dge.gsets)){
       if(input$mergeGeneSets){
         x <- mergeDgeGeneSet()
         colnames(x)[2] <- "Transcript.ID"
-        y <- left_join(y, x, by = "Transcript.ID") %>%
+        dat <- left_join(dat, x, by = "Transcript.ID") %>%
           select(Transcript.ID, Gene.Symbol, Gene.Set, Annotation, everything())
       }
     }
-    for(i in 1:ncol(y)){
-      if(is.numeric(y[,i])){
-        y[,i] <- as.numeric(formatC(y[,i], digits = 4))
+    for(i in 1:ncol(dat)){
+      if(is.numeric(dat[,i])){
+        dat[,i] <- as.numeric(formatC(dat[,i], digits = 4))
       }
     }
-    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
-    datatable(y,
+    dat$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",dat$Gene.Symbol," target = '_blank'",'>',dat$Gene.Symbol,"</a>",sep='')
+    datatable(dat,
               class = "table-condensed",
               style = "bootstrap4",
               rownames = FALSE,
@@ -1141,7 +1111,7 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   dgeData <- reactive({
     input$comparisonDgeHeatmap
     genes <- callModule(filterOpts, "dgeHeatmap", data = reactive(values$results.file), comparison = reactive(input$comparisonDgeHeatmap),"genes")
@@ -1150,64 +1120,60 @@ output$Unsupervised <- renderMenu({
     genes$Gene.Symbol <- as.character(genes$Gene.Symbol)
     genes$Transcript.ID <- as.character(genes$Transcript.ID)
     if(length(which(genes$Gene.Symbol == "")) > 0){
-     rows <- genes$Gene.Symbol
-     rows[which(rows == "")] <- genes$Transcript.ID[which(rows == "")]
+      rows <- genes$Gene.Symbol
+      rows[which(rows == "")] <- genes$Transcript.ID[which(rows == "")]
     } else{
-     rows <- genes$Gene.Symbol
+      rows <- genes$Gene.Symbol
     }
     if(input$dgePlotGeneSymbols){
-     rownames(dat) <- make.unique(as.character(rows))
+      rownames(dat) <- make.unique(as.character(rows))
     }
     return(dat)
   })
-
+  
   output$test1<-renderUI({
-   if(is.null(values$rowdend3)){
-    if(ctrl()$id ==TRUE){
-     try<-list(3,4)
-     names(try) <- c(paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
+    if(is.null(values$rowdend3)){
+      if(ctrl()$id ==TRUE){
+        try<-list(3,4)
+        names(try) <- c(paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),"All Samples Healthy Normalized")
+      }
+      
+      if(ctrl()$id == FALSE){
+        try<-list(3)
+        names(try) <- paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized")
+      }
     }
     
-    if(ctrl()$id == FALSE){
-     try<-list(3)
-     names(try) <- paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized")
+    if(!is.null(values$rowdend3)){
+      if(ctrl()$id == TRUE){
+        try<-list(1,2,3,4,5)
+        names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),
+                        "All Samples Healthy Normalized","All Samples Baseline Normalized")
+      }
+      if(ctrl()$id == FALSE){
+        try<-list(1,3,5)
+        names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"),paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
+      }
     }
-   }
-   
-   if(!is.null(values$rowdend3)){
-    if(ctrl()$id == TRUE){
-     try<-list(1,2,3,4,5)
-     names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"),"Baseline Healthy Normalized",paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),
-                     "All Samples Healthy Normalized","All Samples Baseline Normalized")
-    }
-    if(ctrl()$id == FALSE){
-     try<-list(1,3,5)
-     names(try) <- c(paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized"),paste0("All Samples ",str_to_sentence(values$norm.method), " Normalized"),"All Samples Baseline Normalized")
-    }
-   }
-   selectizeInput("set1", "Select heatmap:",as.list(try))
+    selectizeInput("set1", "Select heatmap:",as.list(try))
   })
-
-
+  
+  
   dgeHeatmapData <-reactive({
     dat <- dgeData()
     if (input$set1==1){#heatmapbase1
-      if(ctrl()$id == TRUE){
+      if(ctrl()$id){
         base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id & design()$des[,control.var()$id] != control.val()$id)]
-        index <- which(colnames(dat) %in% base_sample_name)
+      } else{
+        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id)] 
       }
-      if(ctrl()$id == FALSE){
-        base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id] == baseline.val()$id)]
-        index <- which(colnames(dat) %in% base_sample_name)
-      }
-      exp_base_sam <- dat[, index]
+      exp_base_sam <- dat[, base_sample_name]
       des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)),]
       y<-manipulateData(y = exp_base_sam, x = des_base_sam,colname = "columnname")
     }
     if (input$set1==2){#heatmapbase2
       base_sample_name <- design()$des$columnname[which(design()$des[,baseline.var()$id]==baseline.val()$id | design()$des[,control.var()$id]==control.val()$id)]
-      index <- which(colnames(dat) %in% base_sample_name)
-      exp_base_sam <- dat[, index]
+      exp_base_sam <- dat[, base_sample_name]
       des_base_sam <- design()$des[which(design()$des$columnname %in% colnames(exp_base_sam)), ]
       y<-manipulateData(y=exp_base_sam,x=des_base_sam,colname ="columnname",ref.var=control.var()$id,ref.val=control.val()$id,long=FALSE,keep.ref=TRUE)
     }
@@ -1231,7 +1197,7 @@ output$Unsupervised <- renderMenu({
     z<-list(y=y)
     return(z)
   })
-
+  
   heatNormType1<-reactive({
     if(input$set1==1) heattxt<-paste0("Baseline ",str_to_sentence(values$norm.method), " Normalized")
     if(input$set1==2) heattxt<-"Baseline Healthy Normalized"
@@ -1294,8 +1260,8 @@ output$Unsupervised <- renderMenu({
     withProgress(message = 'Making plot',
                  detail = 'This may take a while...', value = 1,{
                    aheatmap(dgeMaxRangeData(),Rowv = dgeRowCluster()$ddm,Colv = dgeClusterData()$colddm, treeheight = dgeGraphParams()$treeHeight, fontsize = dgeGraphParams()$fontSize, cexRow = 1.2, 
-                             color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = dgeClusterData()$colAnnot,annColors = dgeHeatColors(),labRow=dgeRowCluster()$labelRows,
-                             breaks=0)
+                            color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = dgeClusterData()$colAnnot,annColors = dgeHeatColors(),labRow=dgeRowCluster()$labelRows,
+                            breaks=0)
                  }
     )
   }, width = function(){dgeGraphParams()$width}, height = function(){dgeGraphParams()$height})
@@ -1306,8 +1272,8 @@ output$Unsupervised <- renderMenu({
     content = function(file){
       png(file, width = (dgeGraphParams()$resolution()/72)*dgeGraphParams()$width, height = (dgeGraphParams()$resolution()/72)*dgeGraphParams()$height, res = dgeGraphParams()$resolution())
       print(aheatmap(dgeMaxRangeData(),Rowv = dgeRowCluster()$ddm,Colv = dgeClusterData()$colddm, treeheight = dgeGraphParams()$treeHeight, fontsize = dgeGraphParams()$fontSize, cexRow = 1.2, 
-                      color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = dgeClusterData()$colAnnot,annColors = dgeHeatColors(),labRow=dgeRowCluster()$labelRows,
-                      breaks=0))
+                     color = colorRampPalette(c("navy", "yellow", "firebrick3"))(100),annCol = dgeClusterData()$colAnnot,annColors = dgeHeatColors(),labRow=dgeRowCluster()$labelRows,
+                     breaks=0))
       dev.off()
     }
   )
@@ -1337,47 +1303,48 @@ output$Unsupervised <- renderMenu({
     }
     return(x)
   })
-
-  observe({
+  
+  dgeComparisons <- reactive({
     req(values$results.file)
     nam <- names(values$results.file)
     index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    updateSelectizeInput(session,"comparison", "Comparison:", choices = p.names, selected = p.names[1])
-    updateSelectizeInput(session,"comparisonModuleMat", "Comparison:", choices = p.names, selected = p.names[1])
-    updateSelectizeInput(session,"comparisonsDownload", "Comparison:", choices = c("All",p.names), selected = "All")
-    updateSelectizeInput(session,"diagnosticsComparison", "Comparison:", choices = p.names, selected = p.names[1])
-    updateSelectizeInput(session,"Vcomparison", "Comparison:", choices = p.names, selected = p.names[1])
+    comparisons <- nam[index]
+    comparisons <- gsub("P.Value.", "", comparisons)
+    return(comparisons)
   })
   
   observe({
-    req(values$results.file)
-    nam <- names(values$results.file)
-    index <- grep("^P.Value",nam)
-    p.names <- nam[index]
-    p.names <- gsub("P.Value.", "", p.names)
-    updateSelectizeInput(session, "comparisonDgeHeatmap", "Comparison:", choices = p.names, selected = input$comparison)
+    req(dgeComparisons())
+    updateSelectizeInput(session,"comparison", "Comparison:", choices = dgeComparisons(), selected = dgeComparisons()[1])
+    updateSelectizeInput(session,"comparisonModuleMat", "Comparison:", choices = dgeComparisons(), selected = dgeComparisons()[1])
+    updateSelectizeInput(session,"comparisonsDownload", "Comparison:", choices = c("All",dgeComparisons()), selected = "All")
+    updateSelectizeInput(session,"diagnosticsComparison", "Comparison:", choices = dgeComparisons(), selected = dgeComparisons()[1])
+    updateSelectizeInput(session,"Vcomparison", "Comparison:", choices = dgeComparisons(), selected = dgeComparisons()[1])
+  })
+  
+  observe({
+    req(dgeComparisons())
+    updateSelectizeInput(session, "comparisonDgeHeatmap", "Comparison:", choices = dgeComparisons(), selected = input$comparison)
   })
   
   output$pvalThreshCurve <- renderPlot({
-    plot(pvalThreshData()$alpha,pvalThreshData()$raw,type="l",main="Multiple Testing Comparison Plot",col="black",xlim=c(0,1),ylim=c(0,1),xlab=expression(alpha),ylab="% of Total Probes in Gene List")
-    lines(pvalThreshData()$alpha,pvalThreshData()$fdr,col="red",lwd=2)
-    lines(pvalThreshData()$alpha,pvalThreshData()$bonf,col="green")
-    legend("bottomright",legend=c("Raw P-value","FDR","Bonf."), lty=c(1,1,1),col=c("black","red","green") )
+    plot(pvalThreshData()$Alpha,pvalThreshData()$Raw,type="l",main="Multiple Testing Comparison Plot",col="black",xlim=c(0,1),ylim=c(0,1),xlab=expression(alpha),ylab="% of Total Probes in Gene List")
+    lines(pvalThreshData()$Alpha,pvalThreshData()$FDR,col="red",lwd=2)
+    lines(pvalThreshData()$Alpha,pvalThreshData()$Bonf,col="green")
+    legend("bottomright",legend=c("Raw P-value","FDR","Bonf"), lty=c(1,1,1),col=c("black","red","green") )
     axis(4,at=1:10/10,labels=round(1:10/10*dim(values$results.file)[1],0))
     lines(c(0,1),c(0,1),lty=2)
   }, height = 400)
-
+  
   output$downloadSC <- downloadHandler(
     filename = function() {paste("Significance_Comparison_Overview", '_', input$alphalevel2, '.csv', sep = '') },
     content = function(file){
-      write.csv(dgeOverview()$z, file,row.names = FALSE)
+      write.csv(dgeOverview(), file,row.names = FALSE)
     }
   )
-
+  
   output$downloadData <- downloadHandler(
-    filename = function() {paste(substring(pcomp(),12),'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
+    filename = function() {paste(substring(sub("^", "P.Value.", input$comparison),12),'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
     content = function(file) {
       input$comparison
       y <- callModule(filterOpts, "dgeResultsTable", data = reactive(values$results.file), comparison = reactive(input$comparison),"genes")
@@ -1399,7 +1366,7 @@ output$Unsupervised <- renderMenu({
   )
   
   output$intro <-renderText({paste("Number of probes in Gene list by method and alpha parameter.")})
-
+  
   modDgeGraphParams <- reactive({
     params <- callModule(graphOptions, "modDgeGraphOptions", varType = "modules")
     params <- list(width = params$width, height = params$height, fontSize = params$fontSize, legendSize = params$legendSize, 
@@ -1410,25 +1377,25 @@ output$Unsupervised <- renderMenu({
   output$dgeModSelection <- renderUI({
     if(!input$baylorMods){return(NULL)}
     if(!is.null(values$dge.annots)){
-     return(
-      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
-                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
-     )
+      return(
+        selectizeInput("dgeModuleSelection", "Module to include:", c("All", "Only Annotated", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                     "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+      )
     } else{
-     return(
-      selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
-                                                                   "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
-     )
+      return(
+        selectizeInput("dgeModuleSelection", "Module to include:", c("All", "First Round", "First Two Rounds", "First Three Rounds", "First Four Rounds", "First Five Rounds",
+                                                                     "First Six Rounds", "First Seven Rounds", "First Eight Rounds"), "First Six Rounds")
+      )
     }
   })
   
   modDgeData <- eventReactive(input$goModDge,{
     dat <- dgeModuleDat()$prop_matrix2*100
     if(!is.null(values$dge.annots)){
-     annots <- values$dge.annots[match(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], 
-                                       as.character(values$dge.annots[,1]), nomatch = 0),]
-     rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))] <- 
-      paste0(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], " ", as.character(annots[,2]))
+      annots <- values$dge.annots[match(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], 
+                                        as.character(values$dge.annots[,1]), nomatch = 0),]
+      rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))] <- 
+        paste0(rownames(dat)[which(rownames(dat) %in% as.character(values$dge.annots[,1]))], " ", as.character(annots[,2]))
     }
     ddm <- NA
     colddm <- NA
@@ -1436,25 +1403,25 @@ output$Unsupervised <- renderMenu({
       dat <- dat[,match(input$comparisonModuleMat, colnames(dat), nomatch = 0), drop = FALSE]
     }
     if(baylorMod()){
-     if(input$dgeModuleSelection == "Only Annotated"){
-      dat <- dat[grep(" ", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Round"){
-      dat <- dat[grep("^M1", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Two Rounds"){
-      dat <- dat[grep("^M1|^M2", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Three Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Four Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Five Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Six Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Seven Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),, drop = FALSE]
-     } else if(input$dgeModuleSelection == "First Eight Rounds"){
-      dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),, drop = FALSE]
-     } 
+      if(input$dgeModuleSelection == "Only Annotated"){
+        dat <- dat[grep(" ", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Round"){
+        dat <- dat[grep("^M1", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Two Rounds"){
+        dat <- dat[grep("^M1|^M2", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Three Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Four Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3|^M4", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Five Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Six Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Seven Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7", rownames(dat)),, drop = FALSE]
+      } else if(input$dgeModuleSelection == "First Eight Rounds"){
+        dat <- dat[grep("^M1|^M2|^M3|^M4|^M5|^M6|^M7|^M8", rownames(dat)),, drop = FALSE]
+      } 
     }
     if(input$uploadModules){
       modNames <- read.csv(input$modSelect$datapath, header = TRUE)
@@ -1477,7 +1444,7 @@ output$Unsupervised <- renderMenu({
     withProgress(message = 'Making plot',
                  detail = 'This may take a while...', value = 1,{
                    aheatmap_circle(modDgeData()$dat,Rowv = modDgeData()$ddm,Colv = modDgeData()$colddm,circleSize = modDgeGraphParams()$circleSize, treeheight = modDgeGraphParams()$treeHeight, fontsize = modDgeGraphParams()$fontSize, cexRow = 1.2, 
-                             color = color.heatmap(),breaks=seq(-100,100,by=4))
+                                   color = color.heatmap(),breaks=seq(-100,100,by=4))
                  }
     )
   }, width = function(){modDgeGraphParams()$width}, height = function(){modDgeGraphParams()$height})
@@ -1488,13 +1455,13 @@ output$Unsupervised <- renderMenu({
       png(file, width = (modDgeGraphParams()$resolution/72)*modDgeGraphParams()$width, height = (modDgeGraphParams()$resolution/72)*modDgeGraphParams()$height, 
           res = modDgeGraphParams()$resolution)
       print(aheatmap_circle(modDgeData()$dat,Rowv = modDgeData()$ddm,Colv = modDgeData()$colddm,circleSize = modDgeGraphParams()$circleSize, treeheight = modDgeGraphParams()$treeHeight, fontsize = modDgeGraphParams()$fontSize, cexRow = 1.2, 
-                      color = color.heatmap(),breaks=seq(-100,100,by=4)))
+                            color = color.heatmap(),breaks=seq(-100,100,by=4)))
       dev.off()
     }
   )
-
+  
   output$downloadModDgeData <- downloadHandler(
-
+    
     filename = function() {paste(values$project.name,"_LMM_ModuleData",'_',input$correction_method1,input$alphalevel1,'.csv', sep='')},
     content = function(file) {
       write.csv(modDgeData()$dat, file)
@@ -1502,139 +1469,87 @@ output$Unsupervised <- renderMenu({
   )
   
   observe({
-    req(input$Vcomparison)
-    updateSelectizeInput(session, "Include", "Include:", choices = input$Vcomparison, selected = input$Vcomparison[1:length(input$Vcomparison)])
+    req(input$vennComparison)
+    updateSelectizeInput(session, "Include", "Include:", choices = input$vennComparison, selected = input$vennComparison[1:length(input$vennComparison)])
   })
   
   observe({
     req(input$Include)
-    comparisons <- setdiff(input$Vcomparison, input$Include)
+    comparisons <- setdiff(input$vennComparison, input$Include)
     updateSelectizeInput(session,"Exclude", "Exclude:", choices = comparisons, selected = comparisons[1])
   })
-
+  
   venndata <- reactive({
-    input$Vcomparison
+    input$vennComparison
     venn.data <- list()
-    for(i in 1:length(input$Vcomparison)){
-      venn.data[[i]] <- callModule(filterOpts, "dgeVenn", reactive(values$results.file), reactive(input$Vcomparison[i]), "genes")
+    for(i in 1:length(input$vennComparison)){
+      venn.data[[i]] <- callModule(filterOpts, "dgeVenn", reactive(values$results.file), reactive(input$vennComparison[i]), "genes")
       venn.data[[i]] <- as.character(venn.data[[i]][,1])
     }
-    names(venn.data) <- input$Vcomparison
+    names(venn.data) <- input$vennComparison
     if(length(venn.data) > 5){
-    venn.data <- venn.data[1:5]
+      venn.data <- venn.data[1:5]
     }
     return(venn.data)
   })
-
-  Venn.intersection <- reactive({
+  
+  vennIntersection <- reactive({
     req(venndata())
     venndata1 <- venndata()[which(names(venndata()) %in% input$Include)]
     intersections <- Reduce(intersect, venndata1)
     n = length(input$Exclude)
     if(n > 0){
-      venndata2 <- venndata()[which(names(venndata()) %in% input$Exclude)]
-      venndata2 = unlist(venndata2)
+      venndata2 <- unlist(venndata()[which(names(venndata()) %in% input$Exclude)])
       excl <- list(intersections, venndata2)
       intersections <- Reduce(setdiff, excl)
     }
     return(intersections)
   })
   
-  output$testing <- renderText({
-    length(venndata())
-  })
-
-  Venn.union <- reactive({
+  vennUnion <- reactive({
     req(venndata())
     venndata1 <- venndata()[which(names(venndata()) %in% input$Include)]
     unions <- Reduce(union, venndata1)
     n = length(input$Exclude)
     if(n > 0){
-      venndata2 <- venndata()[which(names(venndata()) %in% input$Exclude)]
-      venndata2 <- unlist(venndata2)
+      venndata2 <- unlist(venndata()[which(names(venndata()) %in% input$Exclude)])
       excl <- list(unions, venndata2)
       unions <- Reduce(setdiff, excl)
     }
     return(unions)
   })
-
-  genelist2 <- reactive({
-    n = length(input$Include)
+  
+  vennGeneList <- reactive({
+    n <- length(input$Include)
     comp <- input$Include
-    fcomp <- list()
+    if(input$UorI == "Intersection"){
+      y <- which(values$results.file[,1] %in% vennIntersection())
+    } else{
+      y <- which(values$results.file[,1] %in% vennUnion())
+    }
+    ids <- values$results.file[y,1:2]
+    x <- pvals <- estimates <- list()
     for(i in 1:n){
-      fcomp[[i]] <- c(paste0("Estimate.", input$Include[i]), paste0("Test.statistic.", input$Include[i]),
-                      paste0("P.Value.", input$Include[i]))
+      x[[i]] <- values$results.file[y,match(c(paste0("Estimate.", input$Include[i]),paste0("P.Value.", input$Include[i])), colnames(values$results.file))]
+      x[[i]] <- x[[i]][,c(grep("^Estimate", colnames(x[[i]])),grep("^P.Value", colnames(x[[i]])))]
+      colnames(x[[i]]) <- c(paste("Log2FC", comp[i], sep = " "), paste("P.Value", comp[i], sep = " "))
     }
-    if(input$UorI == 1){
-      y <- which(values$results.file[,1] %in% Venn.intersection())
-      cols <- list()
-      for(i in 1:n){
-        cols[[i]] <- match(fcomp[[i]], colnames(values$results.file))
-      }
-    }
-    if(input$UorI == 2){
-      y <- which(values$results.file[,1] %in% Venn.union())
-      cols <- list()
-      for(i in 1:n){
-        #cols[[i]] <- grep(fcomp[i], colnames(values$results.file))
-        cols[[i]] <- match(fcomp[[i]], colnames(values$results.file))
+    x <- cbind(ids, do.call("cbind", x))
+    for(i in 1:ncol(x)){
+      if(is.numeric(x[,i])){
+        x[,i] <- as.numeric(formatC(x[,i], digits = 4))
       }
     }
-    x = list()
-    pcols = list()
-    pvals_fdr = list()
-    pvals_bonf = list()
-    pvals <- list()
-    estimates <- list()
-    tstats <- list()
-    for(i in 1:n){
-      if(i == 1){
-        x[[i]] <- values$results.file[y,c(1,2,cols[[i]])]
-      }
-      if(i > 1){
-        x[[i]] <- values$results.file[y,cols[[i]]]
-      }
-      pvals[[i]] <- grep("^P.Value", colnames(x[[i]]))
-      estimates[[i]] <- grep("^Estimate", colnames(x[[i]]))
-      tstats[[i]] <- grep("^Test.statistic", colnames(x[[i]]))
-      if(i == 1){
-        x[[i]] <- x[[i]][,c(1,2,estimates[[i]],pvals[[i]])]
-      }
-      if(i > 1){
-        x[[i]] <- x[[i]][,c(estimates[[i]],pvals[[i]])]
-      }
-    }
-    for(i in 1:n){
-      if(i == 1){
-        colnames(x[[i]]) = c("Transcript.ID", "Gene.Symbol", "Log2FC","P.Value")
-      }
-      if(i > 1){
-        colnames(x[[i]]) = c("Log2FC", "P.Value")
-      }
-    }
-    if(n > 1){
-      for(i in 1:n){
-        if(i == 1){
-          colnames(x[[i]]) = c("Transcript.ID", "Gene.Symbol", paste("Log2FC for", comp[i], sep = " "), paste("P.Value.", comp[i], sep =" "))
-        }
-        if(i > 1){
-          colnames(x[[i]]) = c(paste("Log2FC for", comp[i], sep = " "), paste("P.Value.", comp[i], sep = " "))
-        }
-      }
-    }
-    x = do.call("cbind", x)
     if(nrow(x) == 0){
-      x <- data.frame("No Genes Present")
-      names(x) <- "Transcript.ID"
+      x <- data.frame(Transcript.ID = "No Genes Present")
     }
     return(x)
   })
-
+  
   output$vennIntersection <- renderDT({
-    y <- genelist2()
-    y$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",y$Gene.Symbol," target = '_blank'",'>',y$Gene.Symbol,"</a>",sep='')
-    datatable(y,
+    dat <- vennGeneList()
+    dat$Gene.Symbol <- paste("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=",dat$Gene.Symbol," target = '_blank'",'>',dat$Gene.Symbol,"</a>",sep='')
+    datatable(dat,
               class = "table-condensed",
               style = "bootstrap4",
               rownames = FALSE,
@@ -1642,42 +1557,42 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   output$vennDiagram <- renderPlot({
     dummy <- data.frame("No Genes Present")
     names(dummy) <- "Transcript.ID"
-    if(identical(genelist2(),dummy)){return(NULL)}
+    if(identical(vennGeneList(),dummy)){return(NULL)}
     color.choices = c("blue", "green", "red", "orange","purple")
-    color.choices <- color.choices[1:length(vendata())]
+    color.choices <- color.choices[1:length(venndata())]
     grid.draw(venn.diagram(venndata(), filename = NULL, lwd = 1, col = color.choices, cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,
                            euler.d = TRUE))
   }, height = 400)
-
+  
   output$downloadVennData <- downloadHandler(
     filename = function() {paste0("VennDiagram_", input$UorI, '.csv')  },
     content = function(file) {
       dummy <- data.frame("No Genes Present")
       names(dummy) <- "Transcript.ID"
-      if(identical(genelist2(),dummy)){return(NULL)}
-      write.csv(genelist2(), file,row.names = FALSE)
+      if(identical(vennGeneList(),dummy)){return(NULL)}
+      write.csv(vennGeneList(), file,row.names = FALSE)
     }
   )
-
+  
   output$downloadVennPic <- downloadHandler(
     filename = function() {paste0("VennDiagram_", input$UorI, '.png')  },
     content = function(file) {
       dummy <- data.frame("No Genes Present")
       names(dummy) <- "Transcript.ID"
-      if(identical(genelist2(),dummy)){return(NULL)}
+      if(identical(vennGeneList(),dummy)){return(NULL)}
       color.choices = c("blue", "green", "red", "orange","purple")
-      color.choices <- color.choices[1:length(vendata())]
+      color.choices <- color.choices[1:length(venndata())]
       png(file)
       grid.draw(venn.diagram(venndata(), filename = NULL, lwd = 1, col = color.choices, cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,euler.d = TRUE))
       dev.off()
     }
   )
-
-
+  
+  
   output$downloadLMMModMap2 <- downloadHandler(
     filename = function() {paste('LMMModMap','.png', sep = '')},
     content = function(file){
@@ -1697,9 +1612,9 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
-
-############## QUSAGE #####################
-
+  
+  ############## QUSAGE #####################
+  
   output$qusage <- renderMenu({
     if(is.null(values$qusage.results)){
       return(strong(""))
@@ -1708,7 +1623,7 @@ output$Unsupervised <- renderMenu({
       menuItem("Q-Gen", icon = icon("filter"), tabName = "qusage")
     }
   })
-
+  
   qgenRes <- reactive({
     req(values$qusage.results)
     qgenRes <- values$qusage.results
@@ -1720,11 +1635,11 @@ output$Unsupervised <- renderMenu({
     }
     qgenRes$Bonf <- unlist(bonf)
     if(!is.null(values$annots)){
-     n <- length(values$annots[,1])
-     qgenRes$Modulev2_Annotation <- ""
-     for(i in 1:n){
-      qgenRes$Modulev2_Annotation[which(qgenRes$pathway.name %in% values$annots[,1][i])] <- as.character(values$annots[,2][i])
-     }
+      n <- length(values$annots[,1])
+      qgenRes$Modulev2_Annotation <- ""
+      for(i in 1:n){
+        qgenRes$Modulev2_Annotation[which(qgenRes$pathway.name %in% values$annots[,1][i])] <- as.character(values$annots[,2][i])
+      }
     }
     qgenRes$Comparison <- as.factor(qgenRes$Comparison)
     return(qgenRes)
@@ -1737,14 +1652,14 @@ output$Unsupervised <- renderMenu({
     updateSelectizeInput(session,"geneSetSelect", "Module selection:", choices = gtools::mixedsort(unique(as.character(qgenRes()$pathway.name))), 
                          selected = gtools::mixedsort(unique(as.character(qgenRes()$pathway.name)))[1])
   })
-
+  
   output$PaloOrFirst1  <- renderUI({
     if(length(input$qgenComp) <= 1){return(NULL)}
     else{
       selectizeInput("PaloOrFirst", "Significant gene sets:", choices = c("In at least one comparison chosen" = 1, "In first comparison chosen" = 2), selected = 1)
     }
   })
-
+  
   output$ColorChoice <- renderUI({
     if(length(input$qgenComp) <= 1){return(NULL)}
     else{
@@ -1764,7 +1679,7 @@ output$Unsupervised <- renderMenu({
     }
     return(qgenRes)
   })
-
+  
   venn.data <- reactive({
     req(qgenResFilt())
     dat <- qgenResFilt()
@@ -1777,7 +1692,7 @@ output$Unsupervised <- renderMenu({
     names(dat_sub) <- comparisons
     return(dat_sub)
   })
-
+  
   compOverview <- reactive({
     req(qgenRes())
     resOverview <- qgenRes() %>% 
@@ -1794,7 +1709,7 @@ output$Unsupervised <- renderMenu({
       arrange(desc(Raw))
     return(resOverview)
   })
-
+  
   singleGeneSetDat <- reactive({
     req(qgenRes())
     input$qgenSingleComp
@@ -1861,7 +1776,7 @@ output$Unsupervised <- renderMenu({
     qusage_plot <- qusage_plot + theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
     return(qusage_plot)
   })
-
+  
   singleGeneSetPlot <- reactive({
     req(singleGeneSetDat())
     geneLevelRes <- singleGeneSetDat()$geneLevelRes
@@ -1882,7 +1797,7 @@ output$Unsupervised <- renderMenu({
     gt$layout$clip[gt$layout$name == "panel"] <- "off"
     gt
   })
-
+  
   output$geneSetTable <- renderDT({
     req(singleGeneSetDat())
     dat <- singleGeneSetDat()$geneLevelRes
@@ -1896,12 +1811,12 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   output$geneSetPlot <- renderPlot({
     req(singleGeneSetPlot())
     grid.draw(singleGeneSetPlot())
   },width = function(){input$PlotWidth2}, height = 400)
-
+  
   output$compOverview <- renderDT({
     req(qgenRes())
     datatable(compOverview(),
@@ -1911,12 +1826,12 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   output$logFcPlot <- renderPlot({
     req(qgenRes())
     geneSetLogFcPlot()
   }, width = function(){input$PlotWidth1}, height = 400)
-
+  
   output$venn <- renderUI({
     req(qgenRes())
     req(qgenResFilt())
@@ -1925,7 +1840,7 @@ output$Unsupervised <- renderMenu({
       plotOutput("venndiagram")
     }
   })
-
+  
   output$venn.download <- renderUI({
     req(venn.data())
     if(length(venn.data()) == 1){return(NULL)}
@@ -1933,7 +1848,7 @@ output$Unsupervised <- renderMenu({
       downloadButton("downloadVenn2", "Download Figure")
     }
   })
-
+  
   vennPlot <- reactive({
     req(venn.data())
     color.choices <- c("blue", "red","green","lightskyblue","purple","hotpink","brown","gold")
@@ -1944,12 +1859,12 @@ output$Unsupervised <- renderMenu({
     return(venn.diagram(venn.data(), filename = NULL, lwd = 1, col = color.choices, 
                         cat.cex = .9, fil = color.choices, margin = .12, ext.text = FALSE,euler.d = TRUE))
   })
-
+  
   output$venndiagram <- renderPlot({
     req(qgenResFilt())
     grid.draw(vennPlot())
   }, height = 400)
-
+  
   output$multipleCompTab <- renderDT({
     req(qgenResFilt())
     qgenResFilt <- qgenResFilt() %>% dplyr::rename(P.Value = p.Value)
@@ -1971,14 +1886,14 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   output$downloadSigComps <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Qusage_Sig_Comps_Table','.csv', sep='')  },
     content = function(file) {
       write.csv(compOverview(), file,row.names = FALSE)
     }
   )
-
+  
   output$downloadPlot2 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Multi_Comparisons_Plot','.png', sep = '')},
     content = function(file){
@@ -1987,7 +1902,7 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
-
+  
   output$downloadVenn2 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Multi_Comparisons_Venn', '.png', sep = '')},
     content = function(file){
@@ -1996,7 +1911,7 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
-
+  
   output$downloadTable2 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Qusage_Data_Table_Multi_Comp','.csv', sep='')  },
     content = function(file) {
@@ -2005,7 +1920,7 @@ output$Unsupervised <- renderMenu({
       write.csv(qgenResFilt, file,row.names = FALSE)
     }
   )
-
+  
   output$downloadPlot3 <- downloadHandler(
     filename = function() {paste(values$project.name,'_', 'Individual_GeneSet_Plot','.png', sep = '')},
     content = function(file){
@@ -2014,16 +1929,16 @@ output$Unsupervised <- renderMenu({
       dev.off()
     }
   )
-
+  
   output$downloadTable3 <- downloadHandler(
     filename = function() {paste(values$project.name,'_','Qusage_Individual_GeneSet_Data_Table','.csv', sep='')  },
     content = function(file) {
       write.csv(singleGeneSetDat()$geneLevelRes[,-1], file,row.names = FALSE)
     }
   )
-
+  
   ################### ROAST ############################
-
+  
   output$roast <- renderMenu({
     if(is.null(values$roast.results)){
       return(strong(""))
@@ -2032,12 +1947,12 @@ output$Unsupervised <- renderMenu({
       menuItem("Roast", icon = icon("th-list"), tabName = "roast")
     }
   })
-
+  
   observe({
     req(values$roast.results)
     updateSelectizeInput(session,"setStat", "Select gene set statistic:", choices = names(values$roast.results), selected = names(values$roast.results)[1])
   })
-
+  
   roast.overview <- reactive({
     results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat)]]
     Comparison <- names(results)
@@ -2051,7 +1966,7 @@ output$Unsupervised <- renderMenu({
     overview <- data.frame(Comparison = Comparison, Raw = Raw, FDR = FDR, Bonf = Bonf)
     overview
   })
-
+  
   roast.results <- reactive({
     results <- values$roast.results[[which(names(values$roast.results) %in% input$setStat)]]
     for(i in 2:length(results)){
@@ -2062,7 +1977,7 @@ output$Unsupervised <- renderMenu({
     results <- cbind(Gene.set, results)
     results
   })
-
+  
   output$compOverviewR <- renderDT({
     datatable(roast.overview(),
               class = "table-condensed",
@@ -2071,7 +1986,7 @@ output$Unsupervised <- renderMenu({
               options = list(autowidth = TRUE, scrollX = TRUE)
     )
   })
-
+  
   ###############Correlations########################
   
   output$correlations <- renderMenu({
@@ -2451,7 +2366,7 @@ output$Unsupervised <- renderMenu({
     if(ncol(heatmap.data()$dat) > 1){
       if(input$colorRange){
         return(aheatmap(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, 
-                         color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+                        color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
       }
       return(aheatmap(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), 
                       border_color = "grey60", Rowv = row_clust.corr(), breaks = 0))
@@ -2472,7 +2387,7 @@ output$Unsupervised <- renderMenu({
       png(file, width = (plotresolution.corr()/72)*width1(), height = (plotresolution.corr()/72)*height1(), res = plotresolution.corr())
       if(input$colorRange){
         print(aheatmap(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize,  
-                        color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
+                       color = color.heatmap(), border_color = "grey60", Rowv = row_clust.corr(), breaks = seq(-1,1,by=.04)))
       } else{
         print(aheatmap(heatmap.data()$dat,Colv = col_clust.corr(),annCol = heatmap.data()$col_anno,labRow = rows.plot(),treeheight = input$corrTreeHeight, fontsize = input$corrFontSize, color = color.heatmap(), 
                        border_color = "grey60", Rowv = row_clust.corr(), breaks = 0))
@@ -2588,7 +2503,6 @@ output$Unsupervised <- renderMenu({
   })
   
   correlation.data <- reactive({
-    #correlations <- values$corrs[[which(values$corr.names == input$TypeVariable5)]]
     correlations <- corrResultsOverview()$correlations[[which(values$corr.names == input$TypeVariable5)]]
     if(input$var_switch3 == TRUE){
       correlations <- correlations[,c(2,1,3:ncol(correlations))]
@@ -2918,5 +2832,5 @@ output$Unsupervised <- renderMenu({
   )
   
   ################End of Correlations Part###################
-
+  
 })

@@ -15,7 +15,7 @@ filterOptsUI <- function(id){
                      selectInput(ns("correction_method"),"Multiple testing correction:",
                                  c("FDR","Bonferroni","Raw"),"Raw"),
                      numericInput(ns('alphalevel'),"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),
-                     checkboxInput(inputId = ns("showfc"),label = strong("Filter on fold change"),value = FALSE),
+                     checkboxInput(inputId = ns("showfc"),label = strong("Filter on Log2 FC"),value = FALSE),
                      conditionalPanel(condition = condCall2,
                                       numericInput(inputId = ns("fcval"), label = "Log2 FC cut off:",
                                                    min = 0, max = 10, value = 0, step = 0.25),

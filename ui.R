@@ -275,11 +275,13 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Filtering Options", width = 3, status = "primary", solidHeader = FALSE,
                                     numericInput('alphalevel2',"Significance threshold:", min = 0, max = 1, value = 0.05, step = 0.025),  
-                                    checkboxInput("overviewFc",label = strong("Filter on Log2 FC:"),value = FALSE),
-                                    conditionalPanel(condition = "input.overviewFc",
-                                                     numericInput("selectFcValue", label = "Log2 FC threshold:",min = 0, value = 0, step = 0.1),
-                                                     selectizeInput("selectFcSign","Log2 FC sign:", c("+", "-", "Both"), c("Both"))),
-                                    tags$hr() # add a horizontal line
+                                    numericInput("selectFcValue", label = "Log2 FC threshold:",min = 0, value = 0, step = 0.1),
+                                    selectizeInput("selectFcSign","Log2 FC sign:", c("+", "-", "Both"), c("Both")),
+                                    #checkboxInput("overviewFc",label = strong("Filter on Log2 FC:"),value = FALSE),
+                                    #conditionalPanel(condition = "input.overviewFc",
+                                    #                 numericInput("selectFcValue", label = "Log2 FC threshold:",min = 0, value = 0, step = 0.1),
+                                    #                 selectizeInput("selectFcSign","Log2 FC sign:", c("+", "-", "Both"), c("Both"))),
+                                    hr()
                                 ),
                                 box(title = "Results Overview", width = 9, status = "primary", solidHeader = FALSE,
                                     helpText("Cell value represents the number of significant probes under the selected significance level."),
@@ -381,22 +383,22 @@ body <-  dashboardBody(
                               fluidRow(
                                 box(title = "Options", width = 3, status = "primary", solidHeader = FALSE,
                                     filterOptsUI("dgeVenn"),
-                                    selectizeInput("Vcomparison", "Comparison:", choices = NULL, selected = NULL, multiple = TRUE),
-                                    selectizeInput("UorI", "Intersection or union:", c("Intersection" = 1, "Union" = 2), selected = 1),
+                                    selectizeInput("vennComparison", "Comparison:", choices = NULL, selected = NULL, multiple = TRUE),
+                                    selectizeInput("UorI", "Intersection or union:", c("Intersection", "Union"), selected = "Intersection"),
                                     selectizeInput("Include", "Include:", choices = NULL, selected = NULL, multiple = TRUE),
                                     selectizeInput("Exclude", "Exclude:", choices = NULL, selected = NULL, multiple = TRUE)
                                 ),
-                                column(width = 9,
-                                       box(title = "Venn Diagram", width = NULL, status = "primary", solidHeader = FALSE,
-                                           downloadButton('downloadVennPic', 'Download Figure'),
-                                           plotOutput("vennDiagram")
-                                       ),
-                                       box(title = "Venn Results Table", width = NULL, status = "primary", solidHeader = FALSE,
-                                           downloadButton('downloadVennData', 'Download Data'),
-                                           br(),
-                                           br(),
-                                           DTOutput("vennIntersection")
-                                       )
+                                box(title = "Venn Diagram", width = 9, status = "primary", solidHeader = FALSE,
+                                    downloadButton('downloadVennPic', 'Download Figure'),
+                                    plotOutput("vennDiagram")
+                                )
+                              ),
+                              fluidRow(
+                                box(title = "Venn Results Table", width = 12, status = "primary", solidHeader = FALSE,
+                                    downloadButton('downloadVennData', 'Download Data'),
+                                    br(),
+                                    br(),
+                                    DTOutput("vennIntersection")
                                 )
                               )
                      ),

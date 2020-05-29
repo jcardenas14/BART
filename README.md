@@ -14,7 +14,9 @@ experiments.
 ### **Installation**
 First, install `BART` dependencies from CRAN:
 ```r
-install.packages(c("shiny", "shinydashboard", "shinyjs", "ggplot2", "RColorBrewer", "fastcluster", "NMF", "grid", "clValid","VennDiagram","gtools","scales","reshape2","data.table","tidyverse","janitor","DT"))
+install.packages(c("shiny", "shinydashboard", "shinyjs", "ggplot2", "RColorBrewer", "fastcluster", "NMF", "grid", "clValid","VennDiagram","gtools","scales","reshape2","data.table","tidyverse","janitor","DT","BiocManager"))
+
+BiocManager::install(“Biobase”)
 ```
 
 Then, `BART` can be run with the following command:
